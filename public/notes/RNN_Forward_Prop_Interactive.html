@@ -1,0 +1,965 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RNN Forward Propagation — Step by Step</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=DM+Sans:wght@300;400;500;600&family=DM+Serif+Display:ital@0;1&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #0d1117;
+  --surface: #161b22;
+  --surface2: #21262d;
+  --border: #30363d;
+  --text: #e6edf3;
+  --muted: #7d8590;
+  --accent: #f7c948;
+  --red: #ff6b6b;
+  --green: #3fb950;
+  --blue: #58a6ff;
+  --teal: #39d0c8;
+  --purple: #bc8cff;
+  --orange: #f0883e;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body { background:var(--bg); color:var(--text); font-family:'DM Sans',sans-serif; min-height:100vh; }
+
+/* ── HEADER ── */
+header {
+  padding: 32px 40px 28px;
+  border-bottom: 1px solid var(--border);
+  background: linear-gradient(135deg, #161b22 0%, #0d1117 100%);
+}
+header .badge {
+  font-family:'JetBrains Mono',monospace;
+  font-size:11px; letter-spacing:3px; color:var(--accent);
+  text-transform:uppercase; margin-bottom:10px; display:block;
+}
+header h1 {
+  font-family:'DM Serif Display',serif;
+  font-size:clamp(1.8rem,3.5vw,2.8rem);
+  font-weight:400; line-height:1.15;
+}
+header h1 em { color:var(--accent); font-style:italic; }
+header p { color:var(--muted); margin-top:8px; font-size:0.95rem; max-width:560px; }
+
+/* ── LAYOUT ── */
+.container { max-width:1100px; margin:0 auto; padding:36px 24px 80px; }
+
+/* ── SECTION TITLES ── */
+.sec-label {
+  font-family:'JetBrains Mono',monospace;
+  font-size:11px; letter-spacing:3px; color:var(--teal);
+  text-transform:uppercase; margin-bottom:8px; display:block;
+}
+h2 { font-family:'DM Serif Display',serif; font-size:1.7rem; font-weight:400; margin-bottom:20px; }
+
+/* ── CARD ── */
+.card {
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:12px;
+  padding:28px;
+  margin-bottom:28px;
+}
+
+/* ── CONCEPT BOX ── */
+.concept {
+  background: linear-gradient(135deg, rgba(247,201,72,0.08), rgba(247,201,72,0.03));
+  border:1px solid rgba(247,201,72,0.25);
+  border-radius:10px;
+  padding:20px 24px;
+  margin-bottom:24px;
+}
+.concept h3 { color:var(--accent); font-size:1rem; margin-bottom:8px; font-family:'JetBrains Mono',monospace; letter-spacing:1px; }
+.concept p { color:#c9d1d9; font-size:0.93rem; line-height:1.7; }
+
+/* ── FORMULA ── */
+.formula {
+  background:var(--surface2);
+  border-left:3px solid var(--accent);
+  border-radius:0 8px 8px 0;
+  padding:16px 20px;
+  font-family:'JetBrains Mono',monospace;
+  font-size:1rem;
+  margin:16px 0;
+  line-height:1.9;
+  overflow-x:auto;
+}
+.formula .lbl { font-size:10px; letter-spacing:2px; color:var(--muted); display:block; margin-bottom:4px; }
+.formula .hi-y { color:var(--accent); }
+.formula .hi-b { color:var(--blue); }
+.formula .hi-g { color:var(--green); }
+.formula .hi-r { color:var(--red); }
+.formula .hi-p { color:var(--purple); }
+.formula .hi-t { color:var(--teal); }
+
+/* ── INPUT GRID ── */
+.input-grid {
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(180px,1fr));
+  gap:14px;
+  margin-bottom:20px;
+}
+.input-group { display:flex; flex-direction:column; gap:6px; }
+.input-group label {
+  font-family:'JetBrains Mono',monospace;
+  font-size:11px; color:var(--muted); letter-spacing:1px;
+}
+.input-group input {
+  background:var(--surface2);
+  border:1px solid var(--border);
+  border-radius:6px;
+  color:var(--text);
+  padding:9px 12px;
+  font-family:'JetBrains Mono',monospace;
+  font-size:0.95rem;
+  outline:none;
+  transition:border-color .2s;
+}
+.input-group input:focus { border-color:var(--accent); }
+
+/* ── BUTTONS ── */
+.btn-row { display:flex; gap:12px; flex-wrap:wrap; margin-top:10px; }
+.btn {
+  font-family:'JetBrains Mono',monospace;
+  font-size:12px; letter-spacing:1px;
+  padding:10px 22px; border-radius:6px;
+  border:none; cursor:pointer;
+  transition:all .2s; text-transform:uppercase;
+}
+.btn-primary { background:var(--accent); color:#0d1117; font-weight:700; }
+.btn-primary:hover { background:#ffe07a; transform:translateY(-1px); }
+.btn-secondary { background:transparent; color:var(--teal); border:1px solid var(--teal); }
+.btn-secondary:hover { background:rgba(57,208,200,0.1); }
+.btn-step { background:var(--surface2); color:var(--text); border:1px solid var(--border); }
+.btn-step:hover { border-color:var(--blue); color:var(--blue); }
+.btn-step.active { background:rgba(88,166,255,0.15); border-color:var(--blue); color:var(--blue); }
+
+/* ── TIMELINE ── */
+.timeline {
+  display:flex; gap:0; margin:20px 0; overflow-x:auto; padding-bottom:6px;
+}
+.ts-item {
+  display:flex; flex-direction:column; align-items:center;
+  min-width:90px; cursor:pointer; position:relative;
+}
+.ts-item:not(:last-child)::after {
+  content:''; position:absolute;
+  top:20px; left:50%; width:100%; height:2px;
+  background:var(--border);
+  z-index:0;
+  transition:background .3s;
+}
+.ts-item.done:not(:last-child)::after { background:var(--teal); }
+.ts-circle {
+  width:40px; height:40px; border-radius:50%;
+  background:var(--surface2); border:2px solid var(--border);
+  display:flex; align-items:center; justify-content:center;
+  font-family:'JetBrains Mono',monospace; font-size:12px; font-weight:700;
+  position:relative; z-index:1; transition:all .3s;
+}
+.ts-item.done .ts-circle { background:rgba(57,208,200,0.15); border-color:var(--teal); color:var(--teal); }
+.ts-item.active .ts-circle { background:rgba(247,201,72,0.2); border-color:var(--accent); color:var(--accent); box-shadow:0 0 16px rgba(247,201,72,0.3); }
+.ts-label { font-size:11px; color:var(--muted); margin-top:6px; font-family:'JetBrains Mono',monospace; }
+
+/* ── COMPUTATION PANEL ── */
+.comp-panel {
+  background:var(--surface2);
+  border:1px solid var(--border);
+  border-radius:10px;
+  overflow:hidden;
+  margin-top:20px;
+}
+.comp-header {
+  background:var(--surface);
+  padding:12px 20px;
+  font-family:'JetBrains Mono',monospace;
+  font-size:12px; letter-spacing:2px; color:var(--muted);
+  border-bottom:1px solid var(--border);
+  display:flex; justify-content:space-between; align-items:center;
+}
+.comp-header .step-badge {
+  background:var(--accent); color:#0d1117;
+  padding:2px 10px; border-radius:4px; font-size:11px; font-weight:700;
+}
+.comp-body { padding:20px; }
+
+/* ── STEP ROW ── */
+.step-row {
+  display:flex; align-items:flex-start; gap:14px;
+  margin-bottom:16px; opacity:0; transform:translateY(8px);
+  transition:all .4s ease;
+}
+.step-row.show { opacity:1; transform:translateY(0); }
+.step-num {
+  width:26px; height:26px; border-radius:50%; flex-shrink:0;
+  display:flex; align-items:center; justify-content:center;
+  font-family:'JetBrains Mono',monospace; font-size:11px; font-weight:700;
+  margin-top:2px;
+}
+.step-content { flex:1; }
+.step-content .step-title {
+  font-size:0.85rem; color:var(--muted);
+  font-family:'JetBrains Mono',monospace; letter-spacing:1px;
+  margin-bottom:4px;
+}
+.step-content .step-math {
+  font-family:'JetBrains Mono',monospace;
+  font-size:1rem; line-height:1.8;
+  background:rgba(255,255,255,0.03);
+  border:1px solid var(--border);
+  border-radius:6px; padding:10px 14px;
+}
+.step-content .step-result {
+  margin-top:6px; font-size:0.88rem; color:var(--muted);
+}
+.step-content .step-result span { color:var(--accent); font-weight:600; font-family:'JetBrains Mono',monospace; }
+
+/* ── DIAGRAM SECTION ── */
+.diagram-area {
+  position:relative;
+  background:var(--surface2);
+  border-radius:10px;
+  overflow:hidden;
+  margin:20px 0;
+}
+.diagram-area svg { display:block; width:100%; }
+
+/* ── FLOW ARROW ANIMATION ── */
+@keyframes flowRight {
+  0% { stroke-dashoffset:100; opacity:0.3; }
+  50% { opacity:1; }
+  100% { stroke-dashoffset:0; opacity:1; }
+}
+@keyframes pulseNode {
+  0%,100% { filter:drop-shadow(0 0 4px currentColor); }
+  50% { filter:drop-shadow(0 0 14px currentColor); }
+}
+.flow-line { stroke-dasharray:6,4; animation:flowRight .8s ease forwards; }
+.pulse-node { animation:pulseNode 1.5s ease infinite; }
+
+@keyframes fadeIn { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:translateY(0)} }
+.fade-in { animation:fadeIn .5s ease forwards; }
+
+/* ── LEGEND ── */
+.legend { display:flex; flex-wrap:wrap; gap:16px; margin:16px 0; }
+.legend-item { display:flex; align-items:center; gap:7px; font-size:12px; color:var(--muted); }
+.legend-dot { width:10px; height:10px; border-radius:50%; flex-shrink:0; }
+
+/* ── NUMBER TABLE ── */
+.num-table { width:100%; border-collapse:collapse; margin:16px 0; font-size:0.88rem; }
+.num-table th {
+  background:var(--surface); padding:9px 14px; text-align:left;
+  font-family:'JetBrains Mono',monospace; font-size:10px;
+  letter-spacing:2px; color:var(--muted); border-bottom:1px solid var(--border);
+}
+.num-table td { padding:9px 14px; border-bottom:1px solid rgba(48,54,61,0.5); font-family:'JetBrains Mono',monospace; }
+.num-table tr:hover td { background:rgba(255,255,255,0.02); }
+.num-table .val { color:var(--accent); font-weight:600; }
+.num-table .pos { color:var(--green); }
+.num-table .neg { color:var(--red); }
+
+/* ── TABS ── */
+.tabs { display:flex; gap:0; border-bottom:1px solid var(--border); margin-bottom:24px; overflow-x:auto; }
+.tab {
+  padding:10px 22px; font-family:'JetBrains Mono',monospace;
+  font-size:12px; letter-spacing:1px; cursor:pointer;
+  color:var(--muted); border-bottom:2px solid transparent;
+  transition:all .2s; white-space:nowrap;
+}
+.tab.active { color:var(--accent); border-bottom-color:var(--accent); }
+.tab:hover:not(.active) { color:var(--text); }
+.tab-content { display:none; }
+.tab-content.active { display:block; }
+
+/* ── INSIGHT BOX ── */
+.insight {
+  border-radius:8px; padding:14px 18px; margin:16px 0;
+  display:flex; gap:12px; align-items:flex-start;
+  font-size:0.9rem; line-height:1.6;
+}
+.insight.yellow { background:rgba(247,201,72,0.07); border:1px solid rgba(247,201,72,0.2); }
+.insight.blue { background:rgba(88,166,255,0.07); border:1px solid rgba(88,166,255,0.2); }
+.insight.green { background:rgba(63,185,80,0.07); border:1px solid rgba(63,185,80,0.2); }
+.insight .icon { font-size:1.2rem; flex-shrink:0; margin-top:1px; }
+
+/* ── PROGRESS BAR ── */
+.progress-wrap { background:var(--surface2); border-radius:4px; height:4px; margin:8px 0 20px; }
+.progress-bar { height:4px; border-radius:4px; background:var(--accent); transition:width .5s ease; }
+
+/* responsive */
+@media(max-width:600px){
+  header{padding:24px 18px;}
+  .container{padding:24px 16px 60px;}
+  .input-grid{grid-template-columns:1fr 1fr;}
+}
+</style>
+</head>
+<body>
+
+<header>
+  <span class="badge">RNN · Forward Propagation · Interactive</span>
+  <h1>See Every <em>Number</em><br>Flow Through the Network</h1>
+  <p>Set your own weights & inputs, then watch RNN forward propagation compute step by step — with full arithmetic shown.</p>
+</header>
+
+<div class="container">
+
+  <!-- ── TABS ── -->
+  <div class="tabs">
+    <div class="tab active" onclick="switchTab('concept')">① Concept</div>
+    <div class="tab" onclick="switchTab('calc')">② Step-by-Step Calculator</div>
+    <div class="tab" onclick="switchTab('trace')">③ Full Sequence Trace</div>
+    <div class="tab" onclick="switchTab('intuition')">④ Intuition Builder</div>
+  </div>
+
+  <!-- ════════════════════ TAB 1: CONCEPT ════════════════════ -->
+  <div class="tab-content active" id="tab-concept">
+    <span class="sec-label">What actually happens</span>
+    <h2>Forward Propagation — Plain English</h2>
+
+    <div class="concept">
+      <h3>🧠 The Core Idea</h3>
+      <p>At each time step, the RNN cell does <strong>one job</strong>: combine what it's seeing <em>right now</em> (input xₜ) with what it <em>remembers</em> from before (hidden state h₍ₜ₋₁₎), and produce a new memory (hₜ). That's it.</p>
+    </div>
+
+    <!-- Animated concept diagram -->
+    <div class="diagram-area">
+      <svg id="concept-svg" viewBox="0 0 800 260" xmlns="http://www.w3.org/2000/svg" style="height:260px;">
+        <!-- Background grid -->
+        <defs>
+          <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+            <path d="M 40 0 L 0 0 0 40" fill="none" stroke="rgba(255,255,255,0.03)" stroke-width="1"/>
+          </pattern>
+        </defs>
+        <rect width="800" height="260" fill="url(#grid)"/>
+
+        <!-- Input xₜ -->
+        <rect x="30" y="100" width="90" height="60" rx="8" fill="rgba(255,107,107,0.15)" stroke="#ff6b6b" stroke-width="1.5"/>
+        <text x="75" y="127" text-anchor="middle" fill="#ff6b6b" font-family="JetBrains Mono" font-size="16" font-weight="700">xₜ</text>
+        <text x="75" y="146" text-anchor="middle" fill="rgba(255,107,107,0.7)" font-family="DM Sans" font-size="11">current input</text>
+
+        <!-- h_{t-1} -->
+        <rect x="30" y="20" width="90" height="60" rx="8" fill="rgba(88,166,255,0.15)" stroke="#58a6ff" stroke-width="1.5"/>
+        <text x="75" y="47" text-anchor="middle" fill="#58a6ff" font-family="JetBrains Mono" font-size="13" font-weight="700">h₍ₜ₋₁₎</text>
+        <text x="75" y="66" text-anchor="middle" fill="rgba(88,166,255,0.7)" font-family="DM Sans" font-size="11">past memory</text>
+
+        <!-- Arrows to cell -->
+        <line x1="120" y1="50" x2="220" y2="120" stroke="#58a6ff" stroke-width="2" stroke-dasharray="5,3" id="arr-h"/>
+        <text x="162" y="82" text-anchor="middle" fill="#58a6ff" font-family="JetBrains Mono" font-size="11">× Wₕₕ</text>
+
+        <line x1="120" y1="130" x2="220" y2="130" stroke="#ff6b6b" stroke-width="2" stroke-dasharray="5,3" id="arr-x"/>
+        <text x="170" y="122" text-anchor="middle" fill="#ff6b6b" font-family="JetBrains Mono" font-size="11">× Wₓₕ</text>
+
+        <!-- RNN Cell -->
+        <rect x="220" y="90" width="160" height="80" rx="12" fill="rgba(247,201,72,0.12)" stroke="#f7c948" stroke-width="2"/>
+        <text x="300" y="122" text-anchor="middle" fill="#f7c948" font-family="JetBrains Mono" font-size="12" font-weight="700">ADD + tanh</text>
+        <text x="300" y="142" text-anchor="middle" fill="rgba(247,201,72,0.7)" font-family="DM Sans" font-size="11">activation function</text>
+        <text x="300" y="158" text-anchor="middle" fill="rgba(247,201,72,0.5)" font-family="JetBrains Mono" font-size="10">+ bias bₕ</text>
+
+        <!-- hₜ output -->
+        <rect x="440" y="90" width="90" height="60" rx="8" fill="rgba(57,208,200,0.15)" stroke="#39d0c8" stroke-width="1.5" id="ht-box"/>
+        <text x="485" y="117" text-anchor="middle" fill="#39d0c8" font-family="JetBrains Mono" font-size="16" font-weight="700">hₜ</text>
+        <text x="485" y="136" text-anchor="middle" fill="rgba(57,208,200,0.7)" font-family="DM Sans" font-size="11">new memory</text>
+
+        <!-- Arrow cell → hₜ -->
+        <line x1="380" y1="130" x2="438" y2="130" stroke="#f7c948" stroke-width="2.5" marker-end="url(#arr-y)"/>
+
+        <!-- hₜ → output -->
+        <rect x="620" y="90" width="90" height="60" rx="8" fill="rgba(63,185,80,0.15)" stroke="#3fb950" stroke-width="1.5"/>
+        <text x="665" y="117" text-anchor="middle" fill="#3fb950" font-family="JetBrains Mono" font-size="16" font-weight="700">ŷₜ</text>
+        <text x="665" y="136" text-anchor="middle" fill="rgba(63,185,80,0.7)" font-family="DM Sans" font-size="11">prediction</text>
+
+        <line x1="530" y1="130" x2="618" y2="130" stroke="#39d0c8" stroke-width="2" stroke-dasharray="5,3"/>
+        <text x="574" y="122" text-anchor="middle" fill="#39d0c8" font-family="JetBrains Mono" font-size="11">× Wₕᵧ</text>
+
+        <!-- hₜ loops back -->
+        <path d="M485,90 Q485,20 300,20 Q180,20 75,20" stroke="#58a6ff" stroke-width="1.5" fill="none" stroke-dasharray="4,3"/>
+        <text x="300" y="14" text-anchor="middle" fill="#58a6ff" font-family="DM Sans" font-size="11">hₜ becomes h₍ₜ₋₁₎ at next step →</text>
+
+        <!-- Arrow markers -->
+        <defs>
+          <marker id="arr-y" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+            <path d="M0,0 L0,6 L8,3 z" fill="#f7c948"/>
+          </marker>
+        </defs>
+
+        <!-- Labels bottom -->
+        <text x="75" y="200" text-anchor="middle" fill="rgba(255,107,107,0.6)" font-family="DM Sans" font-size="11">STEP 1</text>
+        <text x="300" y="200" text-anchor="middle" fill="rgba(247,201,72,0.6)" font-family="DM Sans" font-size="11">STEP 2</text>
+        <text x="485" y="200" text-anchor="middle" fill="rgba(57,208,200,0.6)" font-family="DM Sans" font-size="11">STEP 3</text>
+        <text x="665" y="200" text-anchor="middle" fill="rgba(63,185,80,0.6)" font-family="DM Sans" font-size="11">STEP 4</text>
+        <text x="75" y="215" text-anchor="middle" fill="var(--muted)" font-family="DM Sans" font-size="10">Get inputs</text>
+        <text x="300" y="215" text-anchor="middle" fill="var(--muted)" font-family="DM Sans" font-size="10">Mix + squish</text>
+        <text x="485" y="215" text-anchor="middle" fill="var(--muted)" font-family="DM Sans" font-size="10">Store memory</text>
+        <text x="665" y="215" text-anchor="middle" fill="var(--muted)" font-family="DM Sans" font-size="10">Predict</text>
+      </svg>
+    </div>
+
+    <div class="formula">
+      <span class="lbl">THE TWO EQUATIONS — THIS IS ALL OF FORWARD PROP</span>
+      <div><span class="hi-t">hₜ</span> = tanh( <span class="hi-r">Wₓₕ · xₜ</span>  +  <span class="hi-b">Wₕₕ · h₍ₜ₋₁₎</span>  +  <span class="hi-p">bₕ</span> )</div>
+      <div><span class="hi-g">ŷₜ</span> = softmax( <span class="hi-t">Wₕᵧ · hₜ</span>  +  <span class="hi-p">bᵧ</span> )</div>
+    </div>
+
+    <div class="insight yellow">
+      <span class="icon">💡</span>
+      <div><strong style="color:var(--accent)">Why tanh?</strong> The raw sum Wₓₕ·xₜ + Wₕₕ·h₍ₜ₋₁₎ can be any large number. tanh squishes it into the range <strong>[-1, +1]</strong>. This keeps the hidden state values controlled so they don't explode as we go through many time steps.</div>
+    </div>
+
+    <div class="insight blue">
+      <span class="icon">🔁</span>
+      <div><strong style="color:var(--blue)">The Recurrent Part:</strong> Notice that <strong>hₜ feeds back in as h₍ₜ₋₁₎</strong> at the next time step. This is the "recurrent" connection — the network's memory. Same weights Wₕₕ are used every single time step.</div>
+    </div>
+  </div>
+
+
+  <!-- ════════════════════ TAB 2: CALCULATOR ════════════════════ -->
+  <div class="tab-content" id="tab-calc">
+    <span class="sec-label">Hands-on computation</span>
+    <h2>Step-by-Step Calculator</h2>
+    <p style="color:var(--muted);margin-bottom:24px;">Set simple numbers below, then click <strong style="color:var(--accent)">Compute Step</strong> to see every arithmetic operation — no black boxes.</p>
+
+    <!-- Input section -->
+    <div class="card">
+      <div style="font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:2px;color:var(--teal);margin-bottom:16px;">SET YOUR VALUES (use small numbers to start)</div>
+      <div class="input-grid">
+        <div class="input-group">
+          <label>xₜ — Current Input</label>
+          <input type="number" id="xt" value="1" step="0.1">
+        </div>
+        <div class="input-group">
+          <label>h₍ₜ₋₁₎ — Previous Hidden</label>
+          <input type="number" id="ht_prev" value="0" step="0.1">
+        </div>
+        <div class="input-group">
+          <label>Wₓₕ — Input Weight</label>
+          <input type="number" id="wxh" value="0.5" step="0.1">
+        </div>
+        <div class="input-group">
+          <label>Wₕₕ — Hidden Weight</label>
+          <input type="number" id="whh" value="0.8" step="0.1">
+        </div>
+        <div class="input-group">
+          <label>Wₕᵧ — Output Weight</label>
+          <input type="number" id="why" value="1.0" step="0.1">
+        </div>
+        <div class="input-group">
+          <label>bₕ — Hidden Bias</label>
+          <input type="number" id="bh" value="0.1" step="0.1">
+        </div>
+        <div class="input-group">
+          <label>bᵧ — Output Bias</label>
+          <input type="number" id="by" value="0" step="0.1">
+        </div>
+      </div>
+      <div class="btn-row">
+        <button class="btn btn-primary" onclick="runComputation()">▶ Compute Step by Step</button>
+        <button class="btn btn-secondary" onclick="resetPreset()">↺ Reset to Example</button>
+      </div>
+    </div>
+
+    <!-- Progress -->
+    <div class="progress-wrap"><div class="progress-bar" id="progress" style="width:0%"></div></div>
+
+    <!-- Computation steps display -->
+    <div class="comp-panel" id="comp-panel" style="display:none;">
+      <div class="comp-header">
+        <span>COMPUTATION LOG — ONE TIME STEP</span>
+        <span class="step-badge" id="step-badge">STEP 1</span>
+      </div>
+      <div class="comp-body" id="comp-body"></div>
+    </div>
+
+    <!-- Result diagram -->
+    <div id="result-diagram" style="display:none;margin-top:20px;">
+      <div style="font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:2px;color:var(--teal);margin-bottom:12px;">COMPUTED VALUES — FLOWING THROUGH THE CELL</div>
+      <div class="diagram-area">
+        <svg id="result-svg" viewBox="0 0 800 200" style="height:200px;"></svg>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ════════════════════ TAB 3: SEQUENCE TRACE ════════════════════ -->
+  <div class="tab-content" id="tab-trace">
+    <span class="sec-label">Full sequence walkthrough</span>
+    <h2>Trace Through 4 Time Steps</h2>
+    <p style="color:var(--muted);margin-bottom:24px;">Watch how the hidden state <strong style="color:var(--teal)">accumulates memory</strong> as the network reads a sequence one input at a time.</p>
+
+    <div class="card">
+      <div style="font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:2px;color:var(--teal);margin-bottom:14px;">INPUT SEQUENCE & WEIGHTS</div>
+      <div class="input-grid">
+        <div class="input-group"><label>x₁</label><input type="number" id="sx1" value="1.0" step="0.1"></div>
+        <div class="input-group"><label>x₂</label><input type="number" id="sx2" value="0.5" step="0.1"></div>
+        <div class="input-group"><label>x₃</label><input type="number" id="sx3" value="-0.3" step="0.1"></div>
+        <div class="input-group"><label>x₄</label><input type="number" id="sx4" value="0.8" step="0.1"></div>
+        <div class="input-group"><label>Wₓₕ</label><input type="number" id="swxh" value="0.5" step="0.1"></div>
+        <div class="input-group"><label>Wₕₕ</label><input type="number" id="swhh" value="0.8" step="0.1"></div>
+        <div class="input-group"><label>Wₕᵧ</label><input type="number" id="swhy" value="1.0" step="0.1"></div>
+        <div class="input-group"><label>bₕ</label><input type="number" id="sbh" value="0.1" step="0.1"></div>
+      </div>
+      <div class="btn-row">
+        <button class="btn btn-primary" onclick="runSequence()">▶ Run Full Sequence</button>
+        <button class="btn btn-step active" id="seq-auto-btn" onclick="toggleAuto()">⏸ Auto-Play</button>
+      </div>
+    </div>
+
+    <!-- Timeline -->
+    <div class="timeline" id="seq-timeline">
+      <div class="ts-item" id="ts-0"><div class="ts-circle">h₀</div><div class="ts-label">init</div></div>
+      <div class="ts-item" id="ts-1"><div class="ts-circle">t=1</div><div class="ts-label">step 1</div></div>
+      <div class="ts-item" id="ts-2"><div class="ts-circle">t=2</div><div class="ts-label">step 2</div></div>
+      <div class="ts-item" id="ts-3"><div class="ts-circle">t=3</div><div class="ts-label">step 3</div></div>
+      <div class="ts-item" id="ts-4"><div class="ts-circle">t=4</div><div class="ts-label">step 4</div></div>
+    </div>
+
+    <!-- Sequence visual -->
+    <div class="diagram-area" style="margin-bottom:20px;">
+      <svg id="seq-svg" viewBox="0 0 800 180" style="height:180px;"></svg>
+    </div>
+
+    <!-- Table of all values -->
+    <div id="seq-table-wrap" style="display:none;">
+      <div style="font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:2px;color:var(--teal);margin-bottom:10px;">ALL COMPUTED VALUES</div>
+      <table class="num-table" id="seq-table">
+        <thead><tr><th>TIME STEP</th><th>INPUT xₜ</th><th>PREV h₍ₜ₋₁₎</th><th>Wₓₕ·xₜ</th><th>Wₕₕ·h₍ₜ₋₁₎</th><th>SUM + bₕ</th><th>tanh( ) = hₜ</th><th>ŷₜ</th></tr></thead>
+        <tbody id="seq-tbody"></tbody>
+      </table>
+    </div>
+
+    <div class="insight green" id="memory-insight" style="display:none;">
+      <span class="icon">🔍</span>
+      <div id="memory-text"></div>
+    </div>
+  </div>
+
+
+  <!-- ════════════════════ TAB 4: INTUITION ════════════════════ -->
+  <div class="tab-content" id="tab-intuition">
+    <span class="sec-label">Build deep understanding</span>
+    <h2>Why Does Each Part Exist?</h2>
+
+    <div class="card" style="margin-bottom:20px;">
+      <div style="font-family:'JetBrains Mono',monospace;font-size:13px;color:var(--accent);margin-bottom:16px;font-weight:700;">Explore each component ↓</div>
+
+      <div style="display:flex;flex-direction:column;gap:12px;">
+
+        <details style="border:1px solid var(--border);border-radius:8px;overflow:hidden;">
+          <summary style="padding:14px 18px;cursor:pointer;font-weight:500;background:var(--surface2);list-style:none;display:flex;justify-content:space-between;align-items:center;">
+            <span>🔴 Why multiply xₜ by Wₓₕ?</span><span style="color:var(--muted);">click to expand</span>
+          </summary>
+          <div style="padding:18px 20px;line-height:1.8;color:#c9d1d9;">
+            <p><strong style="color:#ff6b6b">Wₓₕ</strong> is a learnable weight that decides <em>how important</em> the current input is to the hidden state.</p>
+            <div class="formula" style="margin-top:12px;">
+              <div>If <span class="hi-r">Wₓₕ = 0</span>  →  input is completely ignored</div>
+              <div>If <span class="hi-r">Wₓₕ = 1</span>  →  input passes through unchanged</div>
+              <div>If <span class="hi-r">Wₓₕ = -2</span> →  input is flipped and amplified</div>
+            </div>
+            <p>During training, backprop adjusts Wₓₕ so the network learns exactly how much to "listen" to each new input.</p>
+          </div>
+        </details>
+
+        <details style="border:1px solid var(--border);border-radius:8px;overflow:hidden;">
+          <summary style="padding:14px 18px;cursor:pointer;font-weight:500;background:var(--surface2);list-style:none;display:flex;justify-content:space-between;align-items:center;">
+            <span>🔵 Why multiply h₍ₜ₋₁₎ by Wₕₕ?</span><span style="color:var(--muted);">click to expand</span>
+          </summary>
+          <div style="padding:18px 20px;line-height:1.8;color:#c9d1d9;">
+            <p><strong style="color:#58a6ff">Wₕₕ</strong> controls <em>how much of the past memory</em> is carried forward.</p>
+            <div class="formula" style="margin-top:12px;">
+              <div>If <span class="hi-b">Wₕₕ ≈ 0</span>  →  past is forgotten quickly</div>
+              <div>If <span class="hi-b">|Wₕₕ| ≈ 1</span> →  past is remembered strongly</div>
+              <div>If <span class="hi-b">|Wₕₕ| &gt; 1</span> →  past is amplified (can explode!)</div>
+            </div>
+            <p>This is also the matrix that causes the <strong>vanishing gradient</strong> problem — multiplied many times across time steps.</p>
+          </div>
+        </details>
+
+        <details style="border:1px solid var(--border);border-radius:8px;overflow:hidden;">
+          <summary style="padding:14px 18px;cursor:pointer;font-weight:500;background:var(--surface2);list-style:none;display:flex;justify-content:space-between;align-items:center;">
+            <span>🟡 What exactly does tanh do to the sum?</span><span style="color:var(--muted);">click to expand</span>
+          </summary>
+          <div style="padding:18px 20px;line-height:1.8;color:#c9d1d9;">
+            <p>The raw sum <code>Wₓₕ·xₜ + Wₕₕ·h₍ₜ₋₁₎ + bₕ</code> can be any number — potentially very large or very negative. tanh squishes it:</p>
+            <div class="formula" style="margin-top:12px;">
+              <div><span class="hi-y">tanh(x) = (eˣ − e⁻ˣ) / (eˣ + e⁻ˣ)</span></div>
+              <div>tanh(-∞) → <span class="hi-r">-1</span></div>
+              <div>tanh(0)  → <span class="hi-y">0</span></div>
+              <div>tanh(+∞) → <span class="hi-g">+1</span></div>
+            </div>
+            <!-- Mini tanh demo -->
+            <div style="margin-top:14px;">
+              <label style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--muted);">Try it — enter a number and see tanh output:</label>
+              <div style="display:flex;gap:10px;margin-top:8px;align-items:center;flex-wrap:wrap;">
+                <input type="number" id="tanh-input" value="0" step="0.5" style="background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:8px 12px;font-family:'JetBrains Mono',monospace;font-size:14px;width:120px;outline:none;" oninput="updateTanh()">
+                <div style="font-family:'JetBrains Mono',monospace;font-size:16px;">→ tanh = <span id="tanh-out" style="color:var(--accent);font-weight:700;">0.000</span></div>
+              </div>
+              <div style="margin-top:10px;background:var(--surface2);border-radius:6px;overflow:hidden;height:12px;width:100%;position:relative;">
+                <div style="position:absolute;left:50%;top:0;width:1px;height:100%;background:var(--border);"></div>
+                <div id="tanh-bar" style="position:absolute;height:100%;background:var(--accent);transition:all .3s;border-radius:4px;left:50%;width:0%"></div>
+              </div>
+              <div style="display:flex;justify-content:space-between;font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--muted);margin-top:4px;"><span>-1</span><span>0</span><span>+1</span></div>
+            </div>
+          </div>
+        </details>
+
+        <details style="border:1px solid var(--border);border-radius:8px;overflow:hidden;">
+          <summary style="padding:14px 18px;cursor:pointer;font-weight:500;background:var(--surface2);list-style:none;display:flex;justify-content:space-between;align-items:center;">
+            <span>🟢 What is the output ŷₜ used for?</span><span style="color:var(--muted);">click to expand</span>
+          </summary>
+          <div style="padding:18px 20px;line-height:1.8;color:#c9d1d9;">
+            <p>Not all RNN tasks need an output at every step. It depends on the task:</p>
+            <table class="num-table" style="margin-top:10px;">
+              <thead><tr><th>Task Type</th><th>When Output Used</th><th>Example</th></tr></thead>
+              <tbody>
+                <tr><td>Many-to-Many</td><td class="pos">Every step</td><td>Named entity tagging</td></tr>
+                <tr><td>Many-to-One</td><td>Only last step</td><td>Sentiment: "positive/negative"</td></tr>
+                <tr><td>One-to-Many</td><td>Every step (gen.)</td><td>Music / text generation</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </details>
+
+      </div>
+    </div>
+
+    <div class="insight yellow">
+      <span class="icon">🎯</span>
+      <div><strong style="color:var(--accent)">The big picture in one sentence:</strong> Forward propagation is just repeatedly asking <em>"Given what I remember (h) and what I'm seeing now (x), what should I remember next?"</em> — and the answer is always: <code>hₜ = tanh(Wₓₕ·xₜ + Wₕₕ·h₍ₜ₋₁₎ + bₕ)</code></div>
+    </div>
+  </div>
+
+</div><!-- /container -->
+
+<script>
+// ══════════════════════════════════════════
+// TAB SWITCHING
+// ══════════════════════════════════════════
+function switchTab(name) {
+  document.querySelectorAll('.tab').forEach((t,i) => {
+    t.classList.remove('active');
+  });
+  document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+  document.getElementById('tab-'+name).classList.add('active');
+  const tabs = document.querySelectorAll('.tab');
+  const map = {concept:0, calc:1, trace:2, intuition:3};
+  tabs[map[name]].classList.add('active');
+}
+
+// ══════════════════════════════════════════
+// TANH LIVE DEMO
+// ══════════════════════════════════════════
+function tanh(x) { return Math.tanh(x); }
+function updateTanh() {
+  const x = parseFloat(document.getElementById('tanh-input').value) || 0;
+  const y = tanh(x);
+  document.getElementById('tanh-out').textContent = y.toFixed(4);
+  const pct = (y + 1) / 2 * 100; // map [-1,1] to [0,100]
+  const bar = document.getElementById('tanh-bar');
+  if (y >= 0) {
+    bar.style.left = '50%'; bar.style.width = (pct-50)+'%';
+    bar.style.background = '#3fb950';
+  } else {
+    bar.style.left = pct+'%'; bar.style.width = (50-pct)+'%';
+    bar.style.background = '#ff6b6b';
+  }
+}
+updateTanh();
+
+// ══════════════════════════════════════════
+// STEP-BY-STEP CALCULATOR
+// ══════════════════════════════════════════
+function n(v) { return parseFloat(v).toFixed(4); }
+function col(v, cls) { return `<span class="${cls}">${n(v)}</span>`; }
+
+function resetPreset() {
+  document.getElementById('xt').value = 1;
+  document.getElementById('ht_prev').value = 0;
+  document.getElementById('wxh').value = 0.5;
+  document.getElementById('whh').value = 0.8;
+  document.getElementById('why').value = 1.0;
+  document.getElementById('bh').value = 0.1;
+  document.getElementById('by').value = 0;
+  document.getElementById('comp-panel').style.display = 'none';
+  document.getElementById('result-diagram').style.display = 'none';
+  document.getElementById('progress').style.width = '0%';
+}
+
+function runComputation() {
+  const xt   = parseFloat(document.getElementById('xt').value);
+  const ht1  = parseFloat(document.getElementById('ht_prev').value);
+  const wxh  = parseFloat(document.getElementById('wxh').value);
+  const whh  = parseFloat(document.getElementById('whh').value);
+  const why  = parseFloat(document.getElementById('why').value);
+  const bh   = parseFloat(document.getElementById('bh').value);
+  const by   = parseFloat(document.getElementById('by').value);
+
+  // Compute
+  const term1 = wxh * xt;
+  const term2 = whh * ht1;
+  const raw   = term1 + term2 + bh;
+  const ht    = tanh(raw);
+  const preOut = why * ht + by;
+  const yt    = 1 / (1 + Math.exp(-preOut)); // sigmoid for simplicity
+
+  const steps = [
+    {
+      num:1, color:'#ff6b6b', title:'MULTIPLY INPUT BY Wₓₕ',
+      math: `<span class="hi-r">Wₓₕ</span> × <span class="hi-r">xₜ</span>  =  ${n(wxh)} × ${n(xt)}  =  <span class="hi-y">${n(term1)}</span>`,
+      result: `This scales the input. Wₓₕ = ${n(wxh)} means the input is ${Math.abs(wxh) < 1 ? 'reduced' : 'amplified'}.`
+    },
+    {
+      num:2, color:'#58a6ff', title:'MULTIPLY PAST HIDDEN STATE BY Wₕₕ',
+      math: `<span class="hi-b">Wₕₕ</span> × <span class="hi-b">h₍ₜ₋₁₎</span>  =  ${n(whh)} × ${n(ht1)}  =  <span class="hi-y">${n(term2)}</span>`,
+      result: `This scales the memory from the previous step.`
+    },
+    {
+      num:3, color:'#bc8cff', title:'ADD BOTH TERMS + BIAS bₕ',
+      math: `<span class="hi-y">${n(term1)}</span>  +  <span class="hi-y">${n(term2)}</span>  +  <span class="hi-p">${n(bh)}</span>  =  <span class="hi-y">${n(raw)}</span>`,
+      result: `Raw sum before activation. Could be any value.`
+    },
+    {
+      num:4, color:'#f7c948', title:'APPLY tanh ACTIVATION → NEW HIDDEN STATE hₜ',
+      math: `tanh( <span class="hi-y">${n(raw)}</span> )  =  <span class="hi-t">${n(ht)}</span>`,
+      result: `✓ hₜ = ${n(ht)} — constrained to [-1, +1]. This is the new memory state.`
+    },
+    {
+      num:5, color:'#3fb950', title:'COMPUTE OUTPUT ŷₜ FROM hₜ',
+      math: `sigmoid( <span class="hi-t">Wₕᵧ</span> × <span class="hi-t">${n(ht)}</span>  +  <span class="hi-p">${n(by)}</span> )  =  sigmoid(${n(preOut)})  =  <span class="hi-g">${n(yt)}</span>`,
+      result: `ŷₜ = ${n(yt)} — the final prediction for this time step.`
+    }
+  ];
+
+  const panel = document.getElementById('comp-panel');
+  const body  = document.getElementById('comp-body');
+  panel.style.display = 'block';
+  body.innerHTML = '';
+  document.getElementById('progress').style.width = '0%';
+
+  steps.forEach((s, i) => {
+    setTimeout(() => {
+      const div = document.createElement('div');
+      div.className = 'step-row fade-in';
+      div.innerHTML = `
+        <div class="step-num" style="background:${s.color}22;color:${s.color};border:1px solid ${s.color}44;">${s.num}</div>
+        <div class="step-content">
+          <div class="step-title">${s.title}</div>
+          <div class="step-math">${s.math}</div>
+          <div class="step-result">→ ${s.result}</div>
+        </div>`;
+      body.appendChild(div);
+      document.getElementById('step-badge').textContent = `STEP ${s.num}/5`;
+      document.getElementById('progress').style.width = ((i+1)/5*100)+'%';
+
+      if (i === steps.length - 1) {
+        drawResultDiagram(xt, ht1, wxh, whh, why, bh, by, term1, term2, raw, ht, yt);
+      }
+    }, i * 600);
+  });
+}
+
+function drawResultDiagram(xt, ht1, wxh, whh, why, bh, by, t1, t2, raw, ht, yt) {
+  document.getElementById('result-diagram').style.display = 'block';
+  const svg = document.getElementById('result-svg');
+  svg.innerHTML = `
+    <defs>
+      <marker id="ra" markerWidth="7" markerHeight="7" refX="5" refY="3" orient="auto">
+        <path d="M0,0 L0,6 L7,3 z" fill="#f7c948"/>
+      </marker>
+    </defs>
+    <!-- xₜ -->
+    <rect x="10" y="65" width="80" height="70" rx="7" fill="rgba(255,107,107,0.12)" stroke="#ff6b6b" stroke-width="1.5"/>
+    <text x="50" y="95" text-anchor="middle" fill="#ff6b6b" font-family="JetBrains Mono" font-size="12" font-weight="700">xₜ</text>
+    <text x="50" y="112" text-anchor="middle" fill="#ff6b6b" font-family="JetBrains Mono" font-size="13" font-weight="700">${n(xt)}</text>
+    <text x="50" y="126" text-anchor="middle" fill="rgba(255,107,107,0.6)" font-family="DM Sans" font-size="10">×Wₓₕ=${n(wxh)}</text>
+
+    <!-- h_{t-1} -->
+    <rect x="10" y="10" width="80" height="48" rx="7" fill="rgba(88,166,255,0.12)" stroke="#58a6ff" stroke-width="1.5"/>
+    <text x="50" y="30" text-anchor="middle" fill="#58a6ff" font-family="JetBrains Mono" font-size="11" font-weight="700">h₍ₜ₋₁₎=${n(ht1)}</text>
+    <text x="50" y="47" text-anchor="middle" fill="rgba(88,166,255,0.6)" font-family="DM Sans" font-size="10">×Wₕₕ=${n(whh)}</text>
+
+    <!-- Sum node -->
+    <circle cx="230" cy="100" r="28" fill="rgba(247,201,72,0.1)" stroke="#f7c948" stroke-width="2"/>
+    <text x="230" y="96" text-anchor="middle" fill="#f7c948" font-family="JetBrains Mono" font-size="12">Σ</text>
+    <text x="230" y="113" text-anchor="middle" fill="#f7c948" font-family="JetBrains Mono" font-size="10">${n(raw)}</text>
+
+    <!-- Lines -->
+    <line x1="90" y1="34" x2="203" y2="90" stroke="#58a6ff" stroke-width="1.5" marker-end="url(#ra)" stroke-dasharray="4,3"/>
+    <line x1="90" y1="100" x2="200" y2="100" stroke="#ff6b6b" stroke-width="1.5" marker-end="url(#ra)" stroke-dasharray="4,3"/>
+
+    <!-- tanh box -->
+    <rect x="310" y="74" width="90" height="52" rx="8" fill="rgba(247,201,72,0.08)" stroke="#f7c948" stroke-width="1.5"/>
+    <text x="355" y="97" text-anchor="middle" fill="#f7c948" font-family="JetBrains Mono" font-size="11">tanh</text>
+    <text x="355" y="115" text-anchor="middle" fill="#f7c948" font-family="JetBrains Mono" font-size="10">( ${n(raw)} )</text>
+    <line x1="258" y1="100" x2="308" y2="100" stroke="#f7c948" stroke-width="2" marker-end="url(#ra)"/>
+
+    <!-- hₜ -->
+    <rect x="450" y="74" width="90" height="52" rx="8" fill="rgba(57,208,200,0.12)" stroke="#39d0c8" stroke-width="2"/>
+    <text x="495" y="97" text-anchor="middle" fill="#39d0c8" font-family="JetBrains Mono" font-size="12" font-weight="700">hₜ</text>
+    <text x="495" y="116" text-anchor="middle" fill="#39d0c8" font-family="JetBrains Mono" font-size="14" font-weight="700">${n(ht)}</text>
+    <line x1="400" y1="100" x2="448" y2="100" stroke="#f7c948" stroke-width="2" marker-end="url(#ra)"/>
+
+    <!-- ŷₜ -->
+    <rect x="610" y="74" width="90" height="52" rx="8" fill="rgba(63,185,80,0.12)" stroke="#3fb950" stroke-width="2"/>
+    <text x="655" y="97" text-anchor="middle" fill="#3fb950" font-family="JetBrains Mono" font-size="12" font-weight="700">ŷₜ</text>
+    <text x="655" y="116" text-anchor="middle" fill="#3fb950" font-family="JetBrains Mono" font-size="14" font-weight="700">${n(yt)}</text>
+    <line x1="540" y1="100" x2="608" y2="100" stroke="#39d0c8" stroke-width="2" marker-end="url(#ra)"/>
+    <text x="575" y="92" text-anchor="middle" fill="rgba(57,208,200,0.6)" font-family="JetBrains Mono" font-size="10">×Wₕᵧ</text>
+
+    <!-- Labels bottom -->
+    <text x="230" y="160" text-anchor="middle" fill="rgba(247,201,72,0.5)" font-family="DM Sans" font-size="10">add + bias</text>
+    <text x="495" y="160" text-anchor="middle" fill="rgba(57,208,200,0.5)" font-family="DM Sans" font-size="10">new memory</text>
+    <text x="655" y="160" text-anchor="middle" fill="rgba(63,185,80,0.5)" font-family="DM Sans" font-size="10">prediction</text>
+  `;
+}
+
+
+// ══════════════════════════════════════════
+// SEQUENCE TRACE
+// ══════════════════════════════════════════
+let seqData = [];
+let seqStep = 0;
+let autoTimer = null;
+let autoRunning = false;
+
+function runSequence() {
+  const xs   = [1,2,3,4].map(i => parseFloat(document.getElementById('sx'+i).value));
+  const wxh  = parseFloat(document.getElementById('swxh').value);
+  const whh  = parseFloat(document.getElementById('swhh').value);
+  const why  = parseFloat(document.getElementById('swhy').value);
+  const bh   = parseFloat(document.getElementById('sbh').value);
+
+  seqData = [];
+  let h = 0;
+  document.getElementById('seq-tbody').innerHTML = '';
+
+  xs.forEach((x, i) => {
+    const t1  = wxh * x;
+    const t2  = whh * h;
+    const raw = t1 + t2 + bh;
+    const ht  = tanh(raw);
+    const yt  = tanh(why * ht);
+    seqData.push({t:i+1, x, h_prev:h, t1, t2, raw, ht, yt});
+    h = ht;
+  });
+
+  seqStep = 0;
+  document.querySelectorAll('.ts-item').forEach(el => el.classList.remove('done','active'));
+  document.getElementById('ts-0').classList.add('done');
+  document.getElementById('seq-table-wrap').style.display = 'none';
+  document.getElementById('memory-insight').style.display = 'none';
+
+  drawSeqDiagram([]);
+
+  if (autoRunning) clearInterval(autoTimer);
+  autoRunning = true;
+  document.getElementById('seq-auto-btn').textContent = '⏸ Auto-Play';
+  autoTimer = setInterval(() => {
+    if (seqStep < seqData.length) {
+      revealSeqStep(seqStep);
+      seqStep++;
+    } else {
+      clearInterval(autoTimer);
+      autoRunning = false;
+      showSeqTable();
+    }
+  }, 1000);
+}
+
+function toggleAuto() {
+  if (autoRunning) {
+    clearInterval(autoTimer); autoRunning = false;
+    document.getElementById('seq-auto-btn').textContent = '▶ Resume';
+  } else {
+    autoRunning = true;
+    document.getElementById('seq-auto-btn').textContent = '⏸ Auto-Play';
+    autoTimer = setInterval(() => {
+      if (seqStep < seqData.length) { revealSeqStep(seqStep); seqStep++; }
+      else { clearInterval(autoTimer); autoRunning = false; showSeqTable(); }
+    }, 1000);
+  }
+}
+
+function revealSeqStep(idx) {
+  const d = seqData[idx];
+  document.getElementById('ts-'+d.t).classList.add('active');
+  if (idx > 0) document.getElementById('ts-'+seqData[idx-1].t).classList.remove('active').toString(), 
+    document.getElementById('ts-'+seqData[idx-1].t).classList.add('done');
+  drawSeqDiagram(seqData.slice(0, idx+1));
+}
+
+function showSeqTable() {
+  document.querySelectorAll('.ts-item').forEach(el => { el.classList.add('done'); el.classList.remove('active'); });
+  document.getElementById('seq-table-wrap').style.display = 'block';
+  const tbody = document.getElementById('seq-tbody');
+  tbody.innerHTML = '';
+  seqData.forEach(d => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td style="color:var(--teal)">t = ${d.t}</td>
+      <td class="${d.x>=0?'pos':'neg'}">${n(d.x)}</td>
+      <td>${n(d.h_prev)}</td>
+      <td>${n(d.t1)}</td>
+      <td>${n(d.t2)}</td>
+      <td>${n(d.raw)}</td>
+      <td class="val">${n(d.ht)}</td>
+      <td class="${d.yt>=0?'pos':'neg'}">${n(d.yt)}</td>`;
+    tbody.appendChild(tr);
+  });
+
+  // Memory insight
+  const first = seqData[0].ht;
+  const last  = seqData[seqData.length-1].ht;
+  document.getElementById('memory-insight').style.display = 'flex';
+  document.getElementById('memory-text').innerHTML = `
+    <strong style="color:var(--green)">Memory Analysis:</strong> Hidden state started at h₀ = 0 and evolved to 
+    h₁ = ${n(first)} → h₂ = ${n(seqData[1].ht)} → h₃ = ${n(seqData[2].ht)} → h₄ = ${n(last)}.
+    Notice how each step's memory is influenced by <em>all previous inputs</em> through the recurrent connection.
+    The hidden state at t=4 encodes information from x₁, x₂, x₃, and x₄ simultaneously.`;
+}
+
+function drawSeqDiagram(computed) {
+  const svg = document.getElementById('seq-svg');
+  const T = 4;
+  const cellW = 100, gap = 60, startX = 80, cy = 80;
+
+  let html = `<defs><marker id="sa" markerWidth="7" markerHeight="7" refX="5" refY="3" orient="auto"><path d="M0,0 L0,6 L7,3 z" fill="#39d0c8"/></marker></defs>`;
+
+  // h0
+  html += `<circle cx="40" cy="${cy}" r="22" fill="rgba(88,166,255,0.1)" stroke="#58a6ff" stroke-width="1.5"/>`;
+  html += `<text x="40" y="${cy-6}" text-anchor="middle" fill="#58a6ff" font-family="JetBrains Mono" font-size="10">h₀</text>`;
+  html += `<text x="40" y="${cy+9}" text-anchor="middle" fill="#58a6ff" font-family="JetBrains Mono" font-size="11" font-weight="700">0</text>`;
+
+  for (let i = 0; i < T; i++) {
+    const cx = startX + i * (cellW + gap);
+    const done = i < computed.length;
+    const d = done ? computed[i] : null;
+    const cellColor = done ? '#f7c948' : '#30363d';
+    const cellBg = done ? 'rgba(247,201,72,0.12)' : 'rgba(33,38,45,0.8)';
+
+    // Arrow from prev h
+    const prevX = i === 0 ? 62 : (startX + (i-1)*(cellW+gap) + cellW/2 + 22);
+    html += `<line x1="${prevX}" y1="${cy}" x2="${cx-2}" y2="${cy}" stroke="${done?'#39d0c8':'#30363d'}" stroke-width="2" marker-end="url(#sa)"/>`;
+
+    // Cell box
+    html += `<rect x="${cx}" y="${cy-30}" width="${cellW}" height="60" rx="8" fill="${cellBg}" stroke="${cellColor}" stroke-width="1.5"/>`;
+    html += `<text x="${cx+cellW/2}" y="${cy-10}" text-anchor="middle" fill="${cellColor}" font-family="JetBrains Mono" font-size="10">t=${i+1}</text>`;
+    html += `<text x="${cx+cellW/2}" y="${cy+8}" text-anchor="middle" fill="${done?'#39d0c8':'#30363d'}" font-family="JetBrains Mono" font-size="12" font-weight="700">${done ? n(d.ht) : '?'}</text>`;
+    html += `<text x="${cx+cellW/2}" y="${cy+22}" text-anchor="middle" fill="${done?'rgba(57,208,200,0.5)':'#30363d'}" font-family="JetBrains Mono" font-size="9">hₜ</text>`;
+
+    // Input arrow
+    const ix = done ? d.x : '?';
+    html += `<line x1="${cx+cellW/2}" y1="${cy+80}" x2="${cx+cellW/2}" y2="${cy+32}" stroke="${done?'#ff6b6b':'#30363d'}" stroke-width="1.5" stroke-dasharray="4,2"/>`;
+    html += `<text x="${cx+cellW/2}" y="${cy+97}" text-anchor="middle" fill="${done?'#ff6b6b':'#30363d'}" font-family="JetBrains Mono" font-size="11">${done ? n(ix) : '?'}</text>`;
+    html += `<text x="${cx+cellW/2}" y="${cy+112}" text-anchor="middle" fill="rgba(125,133,144,0.6)" font-family="DM Sans" font-size="9">x${i+1}</text>`;
+  }
+
+  svg.innerHTML = html;
+}
+
+// Init sequence diagram
+drawSeqDiagram([]);
+</script>
+</body>
+</html>

@@ -1,0 +1,441 @@
+/* ═══════════════════════════════════════════════
+   Deep Learning Notes — Main Application Logic
+   ═══════════════════════════════════════════════ */
+
+// ── NOTES CONFIGURATION ──
+// Add new notes here. Each entry creates a sidebar link.
+// Categories are grouped automatically. Order within a category
+// follows array order.
+const NOTES = [
+    {
+        id: 'rnn-notes',
+        title: 'Recurrent Neural Networks',
+        file: 'RNN_Notes.html',
+        category: 'RNN',
+        icon: '<svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>',
+        description: 'Architecture, forward prop, BPTT, vanishing gradients, and variants',
+        tags: ['rnn', 'architecture', 'bptt', 'vanishing gradient'],
+    },
+    {
+        id: 'rnn-forward-prop',
+        title: 'RNN Forward Propagation (Interactive)',
+        file: 'RNN_Forward_Prop_Interactive.html',
+        category: 'RNN',
+        icon: '<svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>',
+        description: 'Interactive step-by-step calculator — see every number flow through the network',
+        tags: ['rnn', 'forward propagation', 'interactive', 'calculator'],
+    },
+    {
+        id: 'rnn-diagram',
+        title: 'RNN Step-by-Step Diagram',
+        file: 'rnn_diagram.html',
+        category: 'RNN',
+        icon: '<svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>',
+        description: 'Visual walkthrough of processing "the food is good" with one-hot encoding',
+        tags: ['rnn', 'diagram', 'one-hot', 'sentiment'],
+    },
+];
+
+// Category metadata for styling (Orange theme)
+const CATEGORY_META = {
+    'Basics': { color: '#fdba74', cssClass: 'cat-basics' },
+    'RNN': { color: '#fb923c', cssClass: 'cat-rnn' },
+    'LSTM': { color: '#f97316', cssClass: 'cat-lstm' },
+    'Transformers': { color: '#ea580c', cssClass: 'cat-transformers' },
+    'CNN': { color: '#c2410c', cssClass: 'cat-cnn' },
+    'Optimization': { color: '#9a3412', cssClass: 'cat-optimization' },
+    'Advanced': { color: '#7c2d12', cssClass: 'cat-advanced' },
+};
+
+// ── DOM REFERENCES ──
+const navTree = document.getElementById('nav-tree');
+const searchInput = document.getElementById('search-input');
+const noteFrame = document.getElementById('note-frame');
+const tocList = document.getElementById('toc-list');
+const tocPanel = document.getElementById('toc-panel');
+const sidebar = document.getElementById('sidebar');
+const menuToggle = document.getElementById('menu-toggle');
+const overlay = document.getElementById('sidebar-overlay');
+const collapseBtn = document.getElementById('sidebar-collapse-btn');
+const tocToggleBtn = document.getElementById('toc-toggle-btn');
+const appLayout = document.querySelector('.app-layout');
+
+// ── STATE ──
+let activeNoteId = null;
+
+// ═══════════════════════════════════════
+// SIDEBAR RENDERING
+// ═══════════════════════════════════════
+function groupByCategory(notes) {
+    const groups = {};
+    for (const note of notes) {
+        if (!groups[note.category]) groups[note.category] = [];
+        groups[note.category].push(note);
+    }
+    return groups;
+}
+
+function renderNavTree(notes) {
+    const groups = groupByCategory(notes);
+    navTree.innerHTML = '';
+
+    if (notes.length === 0) {
+        navTree.innerHTML = `
+      <div class="no-results">
+        <span class="no-results-icon">🔍</span>
+        No notes match your search
+      </div>`;
+        return;
+    }
+
+    for (const [category, items] of Object.entries(groups)) {
+        const meta = CATEGORY_META[category] || { color: '#64748b', cssClass: 'cat-default' };
+
+        const section = document.createElement('div');
+        section.className = `nav-category ${meta.cssClass}`;
+
+        const title = document.createElement('div');
+        title.className = 'nav-category-title';
+        title.textContent = category;
+        section.appendChild(title);
+
+        for (const note of items) {
+            const item = document.createElement('a');
+            item.className = `nav-item${note.id === activeNoteId ? ' active' : ''}`;
+            item.dataset.noteId = note.id;
+            item.title = note.description;
+            item.innerHTML = `
+        <span class="nav-item-icon">${note.icon}</span>
+        <span class="nav-item-label">${note.title}</span>`;
+            item.dataset.tooltip = note.title;
+            item.addEventListener('click', () => loadNote(note.id));
+            section.appendChild(item);
+        }
+
+        navTree.appendChild(section);
+    }
+}
+
+// ═══════════════════════════════════════
+// NOTE LOADING
+// ═══════════════════════════════════════
+function loadNote(noteId) {
+    const note = NOTES.find(n => n.id === noteId);
+    if (!note) return;
+
+    activeNoteId = noteId;
+    noteFrame.src = `./notes/${note.file}`;
+
+    // Update URL hash
+    window.location.hash = `note=${noteId}`;
+
+    // Update active state
+    document.querySelectorAll('.nav-item').forEach(el => {
+        el.classList.toggle('active', el.dataset.noteId === noteId);
+    });
+
+    // Close mobile sidebar
+    closeSidebar();
+
+    // Extract ToC once the iframe loads and reset zoom
+    noteFrame.onload = () => {
+        extractTableOfContents();
+        resetZoom();
+
+        // Bind idle listeners to the iframe document
+        try {
+            const iframeDoc = noteFrame.contentDocument || noteFrame.contentWindow.document;
+            iframeDoc.addEventListener('mousemove', resetIdleTimer);
+            iframeDoc.addEventListener('touchstart', resetIdleTimer);
+            iframeDoc.addEventListener('keydown', resetIdleTimer);
+            // Also trigger once on load to start the timer
+            resetIdleTimer();
+        } catch (e) { }
+    };
+}
+
+// ═══════════════════════════════════════
+// I-FRAME ZOOM CONTROLS
+// ═══════════════════════════════════════
+let currentZoom = 1;
+const ZOOM_STEP = 0.1;
+const MIN_ZOOM = 0.5;
+const MAX_ZOOM = 2.5;
+
+const zoomInBtn = document.getElementById('zoom-in-btn');
+const zoomOutBtn = document.getElementById('zoom-out-btn');
+const zoomResetBtn = document.getElementById('zoom-reset-btn');
+const zoomLevelText = document.getElementById('zoom-level-text');
+
+function applyZoom(scale) {
+    if (scale === 1) {
+        noteFrame.style.transform = '';
+        noteFrame.style.width = '100%';
+        noteFrame.style.height = '100%';
+        noteFrame.style.minWidth = '';
+        noteFrame.style.minHeight = '';
+        noteFrame.style.flex = ''; // Restore flex
+        noteFrame.style.transformOrigin = '';
+    } else {
+        const compensation = `${100 / scale}%`;
+        noteFrame.style.transformOrigin = 'top left';
+        noteFrame.style.transform = `scale(${scale})`;
+        noteFrame.style.width = compensation;
+        noteFrame.style.height = compensation;
+        noteFrame.style.minWidth = compensation;
+        noteFrame.style.minHeight = compensation;
+        noteFrame.style.flex = 'none'; // Prevent flex container from shrinking the iframe
+    }
+    zoomLevelText.textContent = `${Math.round(scale * 100)}%`;
+}
+
+function zoomIn() {
+    if (currentZoom < MAX_ZOOM) {
+        currentZoom = Math.min(currentZoom + ZOOM_STEP, MAX_ZOOM);
+        applyZoom(currentZoom);
+    }
+}
+
+function zoomOut() {
+    if (currentZoom > MIN_ZOOM) {
+        currentZoom = Math.max(currentZoom - ZOOM_STEP, MIN_ZOOM);
+        applyZoom(currentZoom);
+    }
+}
+
+function resetZoom() {
+    currentZoom = 1;
+    applyZoom(currentZoom);
+}
+
+if (zoomInBtn) zoomInBtn.addEventListener('click', zoomIn);
+if (zoomOutBtn) zoomOutBtn.addEventListener('click', zoomOut);
+if (zoomResetBtn) zoomResetBtn.addEventListener('click', resetZoom);
+
+function loadNoteFromHash() {
+    const hash = window.location.hash.slice(1);
+    const match = hash.match(/note=([^&]+)/);
+    if (match) {
+        const noteId = match[1];
+        if (NOTES.find(n => n.id === noteId)) {
+            loadNote(noteId);
+            return;
+        }
+    }
+    // Default: show welcome
+    activeNoteId = null;
+    noteFrame.src = './notes/welcome.html';
+    noteFrame.onload = () => {
+        tocList.innerHTML = '<div class="toc-empty">Select a note to see its outline</div>';
+    };
+}
+
+// ═══════════════════════════════════════
+// TABLE OF CONTENTS
+// ═══════════════════════════════════════
+function extractTableOfContents() {
+    tocList.innerHTML = '';
+
+    try {
+        const doc = noteFrame.contentDocument || noteFrame.contentWindow.document;
+        const headings = doc.querySelectorAll('h1, h2, h3');
+
+        if (headings.length === 0) {
+            tocList.innerHTML = '<div class="toc-empty">No headings found</div>';
+            // Auto-hide ToC when there are no headings
+            appLayout.classList.add('toc-collapsed');
+            return;
+        }
+
+        // Auto-show ToC if the user hasn't explicitly collapsed it
+        if (localStorage.getItem('toc-collapsed') !== '1') {
+            appLayout.classList.remove('toc-collapsed');
+        }
+
+        headings.forEach((heading, i) => {
+            // Ensure heading has an id
+            if (!heading.id) {
+                heading.id = `toc-heading-${i}`;
+            }
+
+            const item = document.createElement('a');
+            item.className = `toc-item toc-${heading.tagName.toLowerCase()}`;
+            item.textContent = heading.textContent.trim();
+            item.addEventListener('click', () => {
+                heading.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            });
+
+            tocList.appendChild(item);
+        });
+    } catch (e) {
+        tocList.innerHTML = '<div class="toc-empty">Table of contents unavailable</div>';
+    }
+}
+
+// ═══════════════════════════════════════
+// SEARCH
+// ═══════════════════════════════════════
+function performSearch(query) {
+    const q = query.toLowerCase().trim();
+
+    if (!q) {
+        renderNavTree(NOTES);
+        return;
+    }
+
+    const filtered = NOTES.filter(note => {
+        const searchable = [
+            note.title,
+            note.description,
+            note.category,
+            ...(note.tags || []),
+        ].join(' ').toLowerCase();
+        return searchable.includes(q);
+    });
+
+    renderNavTree(filtered);
+}
+
+searchInput.addEventListener('input', (e) => {
+    performSearch(e.target.value);
+});
+
+// Keyboard shortcut: "/" to focus search
+document.addEventListener('keydown', (e) => {
+    if (e.key === '/' && document.activeElement !== searchInput) {
+        e.preventDefault();
+        searchInput.focus();
+    }
+    if (e.key === 'Escape' && document.activeElement === searchInput) {
+        searchInput.blur();
+        searchInput.value = '';
+        performSearch('');
+    }
+});
+
+// ═══════════════════════════════════════
+// MOBILE SIDEBAR
+// ═══════════════════════════════════════
+function openSidebar() {
+    sidebar.classList.add('open');
+    overlay.classList.add('show');
+}
+
+function closeSidebar() {
+    sidebar.classList.remove('open');
+    overlay.classList.remove('show');
+}
+
+menuToggle.addEventListener('click', () => {
+    if (sidebar.classList.contains('open')) {
+        closeSidebar();
+    } else {
+        openSidebar();
+    }
+});
+
+overlay.addEventListener('click', closeSidebar);
+
+// ═══════════════════════════════════════
+// SIDEBAR COLLAPSE
+// ═══════════════════════════════════════
+function toggleSidebarCollapse() {
+    const isCollapsed = sidebar.classList.toggle('collapsed');
+    appLayout.classList.toggle('sidebar-collapsed', isCollapsed);
+    localStorage.setItem('sidebar-collapsed', isCollapsed ? '1' : '0');
+}
+
+function restoreSidebarState() {
+    if (localStorage.getItem('sidebar-collapsed') === '1') {
+        sidebar.classList.add('collapsed');
+        appLayout.classList.add('sidebar-collapsed');
+    }
+}
+
+collapseBtn.addEventListener('click', toggleSidebarCollapse);
+
+// Allow clicking anywhere on the collapsed sidebar to expand it
+sidebar.addEventListener('click', (e) => {
+    // Only fire if the sidebar is collapsed and the click isn't on the toggle button itself (handled above)
+    if (sidebar.classList.contains('collapsed') && !e.target.closest('#sidebar-collapse-btn')) {
+        toggleSidebarCollapse();
+    }
+});
+
+// ═══════════════════════════════════════
+// TOC COLLAPSE
+// ═══════════════════════════════════════
+function toggleTocCollapse() {
+    const isCollapsed = appLayout.classList.toggle('toc-collapsed');
+    localStorage.setItem('toc-collapsed', isCollapsed ? '1' : '0');
+    tocToggleBtn.classList.toggle('active', !isCollapsed);
+}
+
+function restoreTocState() {
+    if (localStorage.getItem('toc-collapsed') === '1') {
+        appLayout.classList.add('toc-collapsed');
+    } else {
+        tocToggleBtn.classList.add('active');
+    }
+}
+
+tocToggleBtn.addEventListener('click', toggleTocCollapse);
+
+// ═══════════════════════════════════════
+// UI AUTO-HIDE (IDLE TIMER)
+// ═══════════════════════════════════════
+let idleTimer = null;
+const IDLE_TIMEOUT = 2500; // 2.5 seconds
+const floatingHeader = document.querySelector('.floating-header');
+
+function resetIdleTimer() {
+    // Show UI
+    if (floatingHeader) floatingHeader.classList.remove('ui-hidden');
+
+    const fab = document.getElementById('chat-fab');
+    const chatPanel = document.getElementById('chat-panel-widget');
+    const isChatOpen = chatPanel && chatPanel.classList.contains('open');
+
+    if (fab && !isChatOpen) {
+        fab.classList.remove('ui-hidden');
+    }
+
+    clearTimeout(idleTimer);
+
+    // Set new timer
+    idleTimer = setTimeout(() => {
+        // Only hide if the sidebar menu isn't open and chat isn't open
+        const isSidebarOpen = sidebar.classList.contains('open');
+        const isChatOpenNow = chatPanel && chatPanel.classList.contains('open');
+
+        if (!isSidebarOpen && !isChatOpenNow) {
+            if (floatingHeader) floatingHeader.classList.add('ui-hidden');
+            if (fab) fab.classList.add('ui-hidden');
+        }
+    }, IDLE_TIMEOUT);
+}
+
+// Bind idle listeners to main window
+window.addEventListener('mousemove', resetIdleTimer);
+window.addEventListener('touchstart', resetIdleTimer);
+window.addEventListener('keydown', resetIdleTimer);
+
+// ═══════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════
+function init() {
+    // Restore layout state
+    restoreSidebarState();
+    restoreTocState();
+
+    // Render sidebar
+    renderNavTree(NOTES);
+
+    // Load from hash or show welcome
+    loadNoteFromHash();
+
+    // Listen to hash changes (back/forward)
+    window.addEventListener('hashchange', loadNoteFromHash);
+}
+
+init();

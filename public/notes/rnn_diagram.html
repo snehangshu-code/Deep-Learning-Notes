@@ -1,0 +1,793 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RNN Step-by-Step Diagram</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Syne:wght@400;600;700;800&display=swap');
+
+  :root {
+    --bg: #0a0e1a;
+    --surface: #111827;
+    --surface2: #1a2235;
+    --accent1: #00e5ff;
+    --accent2: #7c3aed;
+    --accent3: #f59e0b;
+    --accent4: #10b981;
+    --accent5: #f43f5e;
+    --text: #e2e8f0;
+    --muted: #64748b;
+    --border: #1e293b;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Syne', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Animated starfield background */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      radial-gradient(1px 1px at 20% 30%, rgba(0,229,255,0.4) 0%, transparent 100%),
+      radial-gradient(1px 1px at 80% 10%, rgba(124,58,237,0.4) 0%, transparent 100%),
+      radial-gradient(1px 1px at 50% 70%, rgba(245,158,11,0.3) 0%, transparent 100%),
+      radial-gradient(1px 1px at 10% 80%, rgba(16,185,129,0.3) 0%, transparent 100%),
+      radial-gradient(1px 1px at 90% 60%, rgba(244,63,94,0.3) 0%, transparent 100%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .container {
+    max-width: 1300px;
+    margin: 0 auto;
+    padding: 40px 24px;
+    position: relative;
+    z-index: 1;
+  }
+
+  header {
+    text-align: center;
+    margin-bottom: 48px;
+  }
+
+  header .label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 4px;
+    color: var(--accent1);
+    text-transform: uppercase;
+    margin-bottom: 12px;
+    opacity: 0.8;
+  }
+
+  header h1 {
+    font-size: clamp(28px, 5vw, 52px);
+    font-weight: 800;
+    background: linear-gradient(135deg, var(--accent1) 0%, var(--accent2) 50%, var(--accent3) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    line-height: 1.1;
+    margin-bottom: 12px;
+  }
+
+  header p {
+    color: var(--muted);
+    font-size: 14px;
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  /* ── SECTION CARDS ── */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 28px;
+    margin-bottom: 24px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, var(--accent1), var(--accent2), transparent);
+  }
+
+  .card-title {
+    font-size: 13px;
+    font-family: 'JetBrains Mono', monospace;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--accent1);
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .card-title .num {
+    background: var(--accent1);
+    color: var(--bg);
+    width: 22px; height: 22px;
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+    font-size: 11px;
+    font-weight: 700;
+    flex-shrink: 0;
+  }
+
+  /* ── ONE-HOT ENCODING TABLE ── */
+  .vocab-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 10px;
+  }
+
+  .vocab-item {
+    background: var(--surface2);
+    border-radius: 10px;
+    padding: 14px;
+    border: 1px solid var(--border);
+    transition: border-color 0.2s;
+  }
+
+  .vocab-item:hover { border-color: var(--accent1); }
+
+  .vocab-word {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    font-weight: 700;
+    margin-bottom: 8px;
+  }
+
+  .onehot-vec {
+    display: flex;
+    gap: 4px;
+  }
+
+  .onehot-vec span {
+    width: 22px; height: 22px;
+    border-radius: 4px;
+    display: grid;
+    place-items: center;
+    font-size: 10px;
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 600;
+  }
+
+  .onehot-vec .one  { background: var(--accent1); color: var(--bg); }
+  .onehot-vec .zero { background: var(--surface); border: 1px solid var(--border); color: var(--muted); }
+
+  /* ── MAIN RNN DIAGRAM ── */
+  .rnn-diagram {
+    width: 100%;
+    overflow-x: auto;
+    padding-bottom: 8px;
+  }
+
+  svg.rnn-svg {
+    display: block;
+    margin: 0 auto;
+    min-width: 860px;
+  }
+
+  /* ── FORMULA BLOCKS ── */
+  .formula-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+
+  @media (max-width: 600px) {
+    .formula-grid { grid-template-columns: 1fr; }
+  }
+
+  .formula-box {
+    background: var(--surface2);
+    border-radius: 12px;
+    padding: 20px;
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--accent2);
+  }
+
+  .formula-box h4 {
+    font-size: 11px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--accent2);
+    font-family: 'JetBrains Mono', monospace;
+    margin-bottom: 10px;
+  }
+
+  .formula-eq {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--accent3);
+    margin-bottom: 10px;
+    letter-spacing: 0.5px;
+  }
+
+  .formula-desc {
+    font-size: 12px;
+    color: var(--muted);
+    line-height: 1.6;
+  }
+
+  .formula-desc strong { color: var(--text); }
+
+  /* ── STEP STEPPER ── */
+  .stepper {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+  }
+
+  .step {
+    display: flex;
+    gap: 16px;
+    position: relative;
+    padding-bottom: 28px;
+    cursor: pointer;
+  }
+
+  .step:last-child { padding-bottom: 0; }
+
+  .step-line {
+    position: absolute;
+    left: 15px;
+    top: 32px;
+    bottom: 0;
+    width: 2px;
+    background: var(--border);
+  }
+
+  .step:last-child .step-line { display: none; }
+
+  .step-dot {
+    width: 32px; height: 32px;
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+    font-size: 12px;
+    font-weight: 700;
+    font-family: 'JetBrains Mono', monospace;
+    flex-shrink: 0;
+    position: relative;
+    z-index: 1;
+    transition: transform 0.2s;
+  }
+
+  .step:hover .step-dot { transform: scale(1.15); }
+
+  .step-content { flex: 1; padding-top: 4px; }
+
+  .step-content h3 {
+    font-size: 14px;
+    font-weight: 700;
+    margin-bottom: 5px;
+  }
+
+  .step-content p {
+    font-size: 13px;
+    color: var(--muted);
+    line-height: 1.65;
+  }
+
+  .step-content code {
+    font-family: 'JetBrains Mono', monospace;
+    background: var(--surface2);
+    padding: 1px 6px;
+    border-radius: 4px;
+    font-size: 12px;
+    color: var(--accent3);
+  }
+
+  /* ── WEIGHT MATRIX TABLE ── */
+  .weight-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+  }
+
+  @media (max-width: 640px) {
+    .weight-grid { grid-template-columns: 1fr; }
+  }
+
+  .weight-card {
+    background: var(--surface2);
+    border-radius: 12px;
+    padding: 18px;
+    border: 1px solid var(--border);
+    text-align: center;
+  }
+
+  .weight-card .sym {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 22px;
+    font-weight: 700;
+    margin-bottom: 6px;
+  }
+
+  .weight-card .dims {
+    font-size: 11px;
+    color: var(--muted);
+    font-family: 'JetBrains Mono', monospace;
+    margin-bottom: 8px;
+  }
+
+  .weight-card p {
+    font-size: 12px;
+    color: var(--muted);
+    line-height: 1.5;
+  }
+
+  /* ── HIGHLIGHT ANIMATION ── */
+  @keyframes pulse-glow {
+    0%, 100% { filter: drop-shadow(0 0 4px currentColor); }
+    50% { filter: drop-shadow(0 0 12px currentColor); }
+  }
+
+  .glow-pulse { animation: pulse-glow 2s ease-in-out infinite; }
+
+  /* ── ACTIVE STEP on diagram ── */
+  .timestep-btn {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px 16px;
+    color: var(--text);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .timestep-btn:hover, .timestep-btn.active {
+    background: var(--accent1);
+    color: var(--bg);
+    border-color: var(--accent1);
+  }
+
+  .btn-row {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-bottom: 20px;
+  }
+
+  /* ── SENTIMENT OUTPUT ── */
+  .output-grid {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+
+  .sentiment-bar {
+    flex: 1;
+    min-width: 120px;
+    background: var(--surface2);
+    border-radius: 10px;
+    padding: 14px;
+    border: 1px solid var(--border);
+  }
+
+  .sentiment-bar .label2 {
+    font-size: 12px;
+    font-family: 'JetBrains Mono', monospace;
+    margin-bottom: 8px;
+  }
+
+  .bar-track {
+    background: var(--border);
+    border-radius: 4px;
+    height: 8px;
+    overflow: hidden;
+  }
+
+  .bar-fill {
+    height: 100%;
+    border-radius: 4px;
+    transition: width 0.5s ease;
+  }
+
+  .bar-pct {
+    font-size: 11px;
+    color: var(--muted);
+    font-family: 'JetBrains Mono', monospace;
+    margin-top: 4px;
+  }
+</style>
+</head>
+<body>
+
+<div class="container">
+
+  <header>
+    <div class="label">Neural Networks · Sequence Modeling</div>
+    <h1>Recurrent Neural Network<br>Step-by-Step</h1>
+    <p>Processing "the food is good" — sentiment classification</p>
+  </header>
+
+  <!-- ① VOCABULARY + ONE-HOT -->
+  <div class="card">
+    <div class="card-title"><span class="num">1</span> Vocabulary & One-Hot Encoding</div>
+    <div class="vocab-grid">
+      <div class="vocab-item">
+        <div class="vocab-word" style="color:#00e5ff">the</div>
+        <div class="onehot-vec">
+          <span class="one">1</span><span class="zero">0</span><span class="zero">0</span><span class="zero">0</span><span class="zero">0</span><span class="zero">0</span>
+        </div>
+      </div>
+      <div class="vocab-item">
+        <div class="vocab-word" style="color:#7c3aed">food</div>
+        <div class="onehot-vec">
+          <span class="zero">0</span><span class="one" style="background:#7c3aed">1</span><span class="zero">0</span><span class="zero">0</span><span class="zero">0</span><span class="zero">0</span>
+        </div>
+      </div>
+      <div class="vocab-item">
+        <div class="vocab-word" style="color:#f59e0b">is</div>
+        <div class="onehot-vec">
+          <span class="zero">0</span><span class="zero">0</span><span class="one" style="background:#f59e0b">1</span><span class="zero">0</span><span class="zero">0</span><span class="zero">0</span>
+        </div>
+      </div>
+      <div class="vocab-item">
+        <div class="vocab-word" style="color:#10b981">good</div>
+        <div class="onehot-vec">
+          <span class="zero">0</span><span class="zero">0</span><span class="zero">0</span><span class="one" style="background:#10b981">1</span><span class="zero">0</span><span class="zero">0</span>
+        </div>
+      </div>
+      <div class="vocab-item">
+        <div class="vocab-word" style="color:#f43f5e">bad</div>
+        <div class="onehot-vec">
+          <span class="zero">0</span><span class="zero">0</span><span class="zero">0</span><span class="zero">0</span><span class="one" style="background:#f43f5e">1</span><span class="zero">0</span>
+        </div>
+      </div>
+      <div class="vocab-item">
+        <div class="vocab-word" style="color:#a78bfa">not</div>
+        <div class="onehot-vec">
+          <span class="zero">0</span><span class="zero">0</span><span class="zero">0</span><span class="zero">0</span><span class="zero">0</span><span class="one" style="background:#a78bfa">1</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ② MAIN DIAGRAM -->
+  <div class="card">
+    <div class="card-title"><span class="num">2</span> RNN Unrolled Through Time</div>
+    <div class="rnn-diagram">
+      <svg class="rnn-svg" viewBox="0 0 900 480" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <!-- Gradients -->
+          <linearGradient id="nodeGrad" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stop-color="#1a2235"/>
+            <stop offset="100%" stop-color="#111827"/>
+          </linearGradient>
+          <linearGradient id="hiddenGrad" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stop-color="#1e1040"/>
+            <stop offset="100%" stop-color="#0f0a2a"/>
+          </linearGradient>
+          <linearGradient id="outGrad" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stop-color="#0a2a1a"/>
+            <stop offset="100%" stop-color="#051a0e"/>
+          </linearGradient>
+          <!-- Arrow markers -->
+          <marker id="arr-cyan" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+            <path d="M0,0 L0,6 L8,3 z" fill="#00e5ff"/>
+          </marker>
+          <marker id="arr-purple" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+            <path d="M0,0 L0,6 L8,3 z" fill="#7c3aed"/>
+          </marker>
+          <marker id="arr-amber" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+            <path d="M0,0 L0,6 L8,3 z" fill="#f59e0b"/>
+          </marker>
+          <marker id="arr-green" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+            <path d="M0,0 L0,6 L8,3 z" fill="#10b981"/>
+          </marker>
+          <marker id="arr-pink" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+            <path d="M0,0 L0,6 L8,3 z" fill="#f43f5e"/>
+          </marker>
+
+          <!-- Glow filters -->
+          <filter id="glow-cyan">
+            <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
+            <feMerge><feMergeNode in="coloredBlur"/><feMergeNode in="SourceGraphic"/></feMerge>
+          </filter>
+          <filter id="glow-purple">
+            <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
+            <feMerge><feMergeNode in="coloredBlur"/><feMergeNode in="SourceGraphic"/></feMerge>
+          </filter>
+          <filter id="glow-green">
+            <feGaussianBlur stdDeviation="4" result="coloredBlur"/>
+            <feMerge><feMergeNode in="coloredBlur"/><feMergeNode in="SourceGraphic"/></feMerge>
+          </filter>
+        </defs>
+
+        <!-- ── BACKGROUND GRID ── -->
+        <pattern id="grid" x="0" y="0" width="40" height="40" patternUnits="userSpaceOnUse">
+          <path d="M40 0L0 0 0 40" fill="none" stroke="#1e293b" stroke-width="0.5"/>
+        </pattern>
+        <rect width="900" height="480" fill="url(#grid)" opacity="0.3"/>
+
+        <!-- ═══════════════ LAYOUT POSITIONS ═══════════════
+             t=0: x=90   (h0 initial)
+             t=1: x=230  (x1="the")
+             t=2: x=410  (x2="food")
+             t=3: x=590  (x3="is")
+             t=4: x=770  (x4="good")
+             Hidden y = 240
+             Input  y = 390
+             Output y = 90
+        -->
+
+        <!-- ═══ h₀ (initial zero state) ═══ -->
+        <rect x="50" y="205" width="80" height="70" rx="10" fill="url(#hiddenGrad)" stroke="#2d1b69" stroke-width="1.5"/>
+        <text x="90" y="238" text-anchor="middle" fill="#a78bfa" font-family="JetBrains Mono" font-size="14" font-weight="700">h₀</text>
+        <text x="90" y="256" text-anchor="middle" fill="#64748b" font-family="JetBrains Mono" font-size="10">[zeros]</text>
+
+        <!-- ── TIME STEP 1 ── -->
+        <!-- Input x₁ box -->
+        <rect x="190" y="355" width="80" height="70" rx="10" fill="url(#nodeGrad)" stroke="#00e5ff" stroke-width="1.5" filter="url(#glow-cyan)"/>
+        <text x="230" y="383" text-anchor="middle" fill="#00e5ff" font-family="JetBrains Mono" font-size="13" font-weight="700">x₁</text>
+        <text x="230" y="400" text-anchor="middle" fill="#94a3b8" font-family="JetBrains Mono" font-size="10">"the"</text>
+        <text x="230" y="415" text-anchor="middle" fill="#64748b" font-family="JetBrains Mono" font-size="9">[1,0,0,0,0,0]</text>
+
+        <!-- Hidden h₁ box -->
+        <rect x="190" y="205" width="80" height="70" rx="10" fill="url(#hiddenGrad)" stroke="#7c3aed" stroke-width="2" filter="url(#glow-purple)"/>
+        <text x="230" y="238" text-anchor="middle" fill="#a78bfa" font-family="JetBrains Mono" font-size="14" font-weight="700">h₁</text>
+        <text x="230" y="256" text-anchor="middle" fill="#64748b" font-family="JetBrains Mono" font-size="9">tanh(Wxh·x₁+Whh·h₀)</text>
+
+        <!-- Wxh arrow x₁→h₁ -->
+        <line x1="230" y1="355" x2="230" y2="280" stroke="#00e5ff" stroke-width="1.5" stroke-dasharray="4,3" marker-end="url(#arr-cyan)"/>
+        <rect x="235" y="310" width="35" height="16" rx="3" fill="#0a0e1a" opacity="0.8"/>
+        <text x="252" y="321" text-anchor="middle" fill="#f59e0b" font-family="JetBrains Mono" font-size="10" font-weight="600">Wxh</text>
+
+        <!-- Whh arrow h₀→h₁ -->
+        <path d="M130,240 L190,240" stroke="#7c3aed" stroke-width="2" marker-end="url(#arr-purple)"/>
+        <rect x="146" y="225" width="35" height="16" rx="3" fill="#0a0e1a" opacity="0.8"/>
+        <text x="163" y="236" text-anchor="middle" fill="#f59e0b" font-family="JetBrains Mono" font-size="10" font-weight="600">Whh</text>
+
+        <!-- ── TIME STEP 2 ── -->
+        <rect x="370" y="355" width="80" height="70" rx="10" fill="url(#nodeGrad)" stroke="#00e5ff" stroke-width="1.5" filter="url(#glow-cyan)"/>
+        <text x="410" y="383" text-anchor="middle" fill="#00e5ff" font-family="JetBrains Mono" font-size="13" font-weight="700">x₂</text>
+        <text x="410" y="400" text-anchor="middle" fill="#94a3b8" font-family="JetBrains Mono" font-size="10">"food"</text>
+        <text x="410" y="415" text-anchor="middle" fill="#64748b" font-family="JetBrains Mono" font-size="9">[0,1,0,0,0,0]</text>
+
+        <rect x="370" y="205" width="80" height="70" rx="10" fill="url(#hiddenGrad)" stroke="#7c3aed" stroke-width="2" filter="url(#glow-purple)"/>
+        <text x="410" y="238" text-anchor="middle" fill="#a78bfa" font-family="JetBrains Mono" font-size="14" font-weight="700">h₂</text>
+        <text x="410" y="256" text-anchor="middle" fill="#64748b" font-family="JetBrains Mono" font-size="9">tanh(Wxh·x₂+Whh·h₁)</text>
+
+        <line x1="410" y1="355" x2="410" y2="280" stroke="#00e5ff" stroke-width="1.5" stroke-dasharray="4,3" marker-end="url(#arr-cyan)"/>
+        <rect x="415" y="310" width="35" height="16" rx="3" fill="#0a0e1a" opacity="0.8"/>
+        <text x="432" y="321" text-anchor="middle" fill="#f59e0b" font-family="JetBrains Mono" font-size="10" font-weight="600">Wxh</text>
+
+        <path d="M270,240 L370,240" stroke="#7c3aed" stroke-width="2" marker-end="url(#arr-purple)"/>
+        <rect x="296" y="225" width="35" height="16" rx="3" fill="#0a0e1a" opacity="0.8"/>
+        <text x="313" y="236" text-anchor="middle" fill="#f59e0b" font-family="JetBrains Mono" font-size="10" font-weight="600">Whh</text>
+
+        <!-- ── TIME STEP 3 ── -->
+        <rect x="550" y="355" width="80" height="70" rx="10" fill="url(#nodeGrad)" stroke="#00e5ff" stroke-width="1.5" filter="url(#glow-cyan)"/>
+        <text x="590" y="383" text-anchor="middle" fill="#00e5ff" font-family="JetBrains Mono" font-size="13" font-weight="700">x₃</text>
+        <text x="590" y="400" text-anchor="middle" fill="#94a3b8" font-family="JetBrains Mono" font-size="10">"is"</text>
+        <text x="590" y="415" text-anchor="middle" fill="#64748b" font-family="JetBrains Mono" font-size="9">[0,0,1,0,0,0]</text>
+
+        <rect x="550" y="205" width="80" height="70" rx="10" fill="url(#hiddenGrad)" stroke="#7c3aed" stroke-width="2" filter="url(#glow-purple)"/>
+        <text x="590" y="238" text-anchor="middle" fill="#a78bfa" font-family="JetBrains Mono" font-size="14" font-weight="700">h₃</text>
+        <text x="590" y="256" text-anchor="middle" fill="#64748b" font-family="JetBrains Mono" font-size="9">tanh(Wxh·x₃+Whh·h₂)</text>
+
+        <line x1="590" y1="355" x2="590" y2="280" stroke="#00e5ff" stroke-width="1.5" stroke-dasharray="4,3" marker-end="url(#arr-cyan)"/>
+        <rect x="595" y="310" width="35" height="16" rx="3" fill="#0a0e1a" opacity="0.8"/>
+        <text x="612" y="321" text-anchor="middle" fill="#f59e0b" font-family="JetBrains Mono" font-size="10" font-weight="600">Wxh</text>
+
+        <path d="M450,240 L550,240" stroke="#7c3aed" stroke-width="2" marker-end="url(#arr-purple)"/>
+        <rect x="476" y="225" width="35" height="16" rx="3" fill="#0a0e1a" opacity="0.8"/>
+        <text x="493" y="236" text-anchor="middle" fill="#f59e0b" font-family="JetBrains Mono" font-size="10" font-weight="600">Whh</text>
+
+        <!-- ── TIME STEP 4 (FINAL) ── -->
+        <rect x="730" y="355" width="80" height="70" rx="10" fill="url(#nodeGrad)" stroke="#10b981" stroke-width="2" filter="url(#glow-green)"/>
+        <text x="770" y="383" text-anchor="middle" fill="#10b981" font-family="JetBrains Mono" font-size="13" font-weight="700">x₄</text>
+        <text x="770" y="400" text-anchor="middle" fill="#94a3b8" font-family="JetBrains Mono" font-size="10">"good"</text>
+        <text x="770" y="415" text-anchor="middle" fill="#64748b" font-family="JetBrains Mono" font-size="9">[0,0,0,1,0,0]</text>
+
+        <!-- Final hidden (glowing bright) -->
+        <rect x="730" y="205" width="80" height="70" rx="10" fill="url(#hiddenGrad)" stroke="#10b981" stroke-width="2.5" filter="url(#glow-green)"/>
+        <text x="770" y="233" text-anchor="middle" fill="#10b981" font-family="JetBrains Mono" font-size="14" font-weight="700">h₄</text>
+        <text x="770" y="250" text-anchor="middle" fill="#4ade80" font-family="JetBrains Mono" font-size="9">FINAL STATE</text>
+        <text x="770" y="265" text-anchor="middle" fill="#64748b" font-family="JetBrains Mono" font-size="8">tanh(Wxh·x₄+Whh·h₃)</text>
+
+        <line x1="770" y1="355" x2="770" y2="280" stroke="#10b981" stroke-width="2" stroke-dasharray="4,3" marker-end="url(#arr-green)"/>
+        <rect x="775" y="310" width="35" height="16" rx="3" fill="#0a0e1a" opacity="0.8"/>
+        <text x="792" y="321" text-anchor="middle" fill="#f59e0b" font-family="JetBrains Mono" font-size="10" font-weight="600">Wxh</text>
+
+        <path d="M630,240 L730,240" stroke="#7c3aed" stroke-width="2" marker-end="url(#arr-purple)"/>
+        <rect x="656" y="225" width="35" height="16" rx="3" fill="#0a0e1a" opacity="0.8"/>
+        <text x="673" y="236" text-anchor="middle" fill="#f59e0b" font-family="JetBrains Mono" font-size="10" font-weight="600">Whh</text>
+
+        <!-- ═══ OUTPUT ŷ ═══ -->
+        <rect x="730" y="75" width="80" height="70" rx="10" fill="url(#outGrad)" stroke="#10b981" stroke-width="2" filter="url(#glow-green)"/>
+        <text x="770" y="103" text-anchor="middle" fill="#10b981" font-family="JetBrains Mono" font-size="14" font-weight="700">ŷ</text>
+        <text x="770" y="120" text-anchor="middle" fill="#4ade80" font-family="JetBrains Mono" font-size="10">softmax</text>
+        <text x="770" y="135" text-anchor="middle" fill="#64748b" font-family="JetBrains Mono" font-size="9">[pos, neg, neu]</text>
+
+        <!-- h₄ → ŷ arrow -->
+        <line x1="770" y1="205" x2="770" y2="150" stroke="#10b981" stroke-width="2" marker-end="url(#arr-green)"/>
+        <rect x="775" y="170" width="32" height="16" rx="3" fill="#0a0e1a" opacity="0.8"/>
+        <text x="791" y="181" text-anchor="middle" fill="#f59e0b" font-family="JetBrains Mono" font-size="10" font-weight="600">Why</text>
+
+        <!-- ── LEGEND ── -->
+        <g transform="translate(50, 440)">
+          <line x1="0" y1="6" x2="30" y2="6" stroke="#7c3aed" stroke-width="2" marker-end="url(#arr-purple)"/>
+          <text x="36" y="10" fill="#94a3b8" font-family="JetBrains Mono" font-size="10">Recurrent (Whh)</text>
+
+          <line x1="160" y1="6" x2="190" y2="6" stroke="#00e5ff" stroke-width="1.5" stroke-dasharray="4,3" marker-end="url(#arr-cyan)"/>
+          <text x="196" y="10" fill="#94a3b8" font-family="JetBrains Mono" font-size="10">Input (Wxh)</text>
+
+          <line x1="310" y1="6" x2="340" y2="6" stroke="#10b981" stroke-width="2" marker-end="url(#arr-green)"/>
+          <text x="346" y="10" fill="#94a3b8" font-family="JetBrains Mono" font-size="10">Output (Why)</text>
+        </g>
+
+        <!-- ── TIMELINE BAR ── -->
+        <text x="90" y="460" text-anchor="middle" fill="#64748b" font-family="JetBrains Mono" font-size="10">t=0</text>
+        <text x="230" y="460" text-anchor="middle" fill="#64748b" font-family="JetBrains Mono" font-size="10">t=1</text>
+        <text x="410" y="460" text-anchor="middle" fill="#64748b" font-family="JetBrains Mono" font-size="10">t=2</text>
+        <text x="590" y="460" text-anchor="middle" fill="#64748b" font-family="JetBrains Mono" font-size="10">t=3</text>
+        <text x="770" y="460" text-anchor="middle" fill="#10b981" font-family="JetBrains Mono" font-size="10" font-weight="700">t=4 →ŷ</text>
+
+        <!-- "MEMORY FLOWS RIGHT" annotation -->
+        <path d="M100,168 L750,168" stroke="#1e293b" stroke-width="1" stroke-dasharray="2,4"/>
+        <text x="420" y="165" text-anchor="middle" fill="#2d3748" font-family="JetBrains Mono" font-size="10">─── memory flows through time ───</text>
+
+        <!-- Dimension labels -->
+        <text x="90" y="300" text-anchor="middle" fill="#374151" font-family="JetBrains Mono" font-size="9">dim: H</text>
+        <text x="230" y="350" text-anchor="middle" fill="#374151" font-family="JetBrains Mono" font-size="9">dim: V</text>
+      </svg>
+    </div>
+  </div>
+
+  <!-- ③ WEIGHT MATRICES -->
+  <div class="card">
+    <div class="card-title"><span class="num">3</span> Weight Matrices</div>
+    <div class="weight-grid">
+      <div class="weight-card">
+        <div class="sym" style="color:#f59e0b">W<sub style="font-size:14px">xh</sub></div>
+        <div class="dims">shape: [H × V]</div>
+        <p>Transforms <strong>input vector xₜ</strong> (vocab size V) into hidden space (size H). Shared across all timesteps.</p>
+      </div>
+      <div class="weight-card">
+        <div class="sym" style="color:#7c3aed">W<sub style="font-size:14px">hh</sub></div>
+        <div class="dims">shape: [H × H]</div>
+        <p>Transforms <strong>previous hidden state hₜ₋₁</strong> into current hidden space. This is the recurrent "memory" connection.</p>
+      </div>
+      <div class="weight-card">
+        <div class="sym" style="color:#10b981">W<sub style="font-size:14px">hy</sub></div>
+        <div class="dims">shape: [C × H]</div>
+        <p>Maps <strong>final hidden state h₄</strong> to output classes C (positive / negative / neutral).</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ④ FORMULAS -->
+  <div class="card">
+    <div class="card-title"><span class="num">4</span> Core Equations</div>
+    <div class="formula-grid">
+      <div class="formula-box">
+        <h4>Hidden State Update</h4>
+        <div class="formula-eq">hₜ = tanh(Wxh·xₜ + Whh·hₜ₋₁)</div>
+        <div class="formula-desc">
+          At each step, the RNN combines two signals: <strong>Wxh·xₜ</strong> (what the current word says) and <strong>Whh·hₜ₋₁</strong> (what was remembered so far). tanh squashes values to (−1, 1), preventing explosion.
+        </div>
+      </div>
+      <div class="formula-box" style="border-left-color: #10b981">
+        <h4>Output Prediction</h4>
+        <div class="formula-eq">ŷ = softmax(Why·h₄)</div>
+        <div class="formula-desc">
+          Only at the <strong>final timestep</strong> (for sentence classification), <strong>Why</strong> projects the compressed hidden state into class scores. Softmax converts scores into a probability distribution over sentiments.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ⑤ STEP-BY-STEP WALKTHROUGH -->
+  <div class="card">
+    <div class="card-title"><span class="num">5</span> Processing "the food is good" — Step by Step</div>
+    <div class="stepper">
+      <div class="step">
+        <div class="step-line"></div>
+        <div class="step-dot" style="background:#1e1040; border:2px solid #a78bfa; color:#a78bfa">0</div>
+        <div class="step-content">
+          <h3 style="color:#a78bfa">Initialise h₀ = [0, 0, …, 0]</h3>
+          <p>Before any word is seen, the hidden state is a zero vector. No "memory" yet.</p>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-line"></div>
+        <div class="step-dot" style="background:#0a1a2a; border:2px solid #00e5ff; color:#00e5ff">1</div>
+        <div class="step-content">
+          <h3 style="color:#00e5ff">t=1 · Read <code>"the"</code> → x₁ = [1,0,0,0,0,0]</h3>
+          <p>Compute <code>h₁ = tanh(Wxh·x₁ + Whh·h₀)</code>. Since h₀=0, this is just <code>tanh(Wxh·x₁)</code> — extracting the "the" representation. h₁ encodes: "a sentence started with 'the'."</p>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-line"></div>
+        <div class="step-dot" style="background:#0a1a2a; border:2px solid #7c3aed; color:#7c3aed">2</div>
+        <div class="step-content">
+          <h3 style="color:#7c3aed">t=2 · Read <code>"food"</code> → x₂ = [0,1,0,0,0,0]</h3>
+          <p>Compute <code>h₂ = tanh(Wxh·x₂ + Whh·h₁)</code>. Now h₁ is carried forward via Whh. h₂ "knows" the sentence so far: "the food…"</p>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-line"></div>
+        <div class="step-dot" style="background:#0a1a2a; border:2px solid #f59e0b; color:#f59e0b">3</div>
+        <div class="step-content">
+          <h3 style="color:#f59e0b">t=3 · Read <code>"is"</code> → x₃ = [0,0,1,0,0,0]</h3>
+          <p>Compute <code>h₃ = tanh(Wxh·x₃ + Whh·h₂)</code>. The word "is" acts as a transition. h₃ encodes: "the food is…" — the network is primed for a sentiment word.</p>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-line"></div>
+        <div class="step-dot" style="background:#051a0e; border:2px solid #10b981; color:#10b981">4</div>
+        <div class="step-content">
+          <h3 style="color:#10b981">t=4 · Read <code>"good"</code> → x₄ = [0,0,0,1,0,0]</h3>
+          <p>Compute <code>h₄ = tanh(Wxh·x₄ + Whh·h₃)</code>. This final hidden state now compresses the <em>entire sentence</em>: "the food is good." Context from all previous words is folded in through the chain of Whh multiplications.</p>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-line"></div>
+        <div class="step-dot" style="background:#051a0e; border:2px solid #f43f5e; color:#f43f5e">→</div>
+        <div class="step-content">
+          <h3 style="color:#f43f5e">Output · ŷ = softmax(Why · h₄)</h3>
+          <p>Project h₄ through Why to get class logits, then softmax. Expected result: high probability on <strong style="color:#10b981">Positive</strong>, low on Negative / Neutral — because "good" is the dominant sentiment signal.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ⑥ SENTIMENT OUTPUT VISUALISATION -->
+  <div class="card">
+    <div class="card-title"><span class="num">6</span> Predicted Sentiment ŷ (Illustrative)</div>
+    <div style="margin-bottom:12px; font-size:13px; color:var(--muted)">
+      After softmax(Why · h₄) — approximate values for trained network on "the food is <strong style="color:#10b981">good</strong>"
+    </div>
+    <div class="output-grid">
+      <div class="sentiment-bar">
+        <div class="label2" style="color:#10b981">😊 Positive</div>
+        <div class="bar-track"><div class="bar-fill" style="width:82%; background:#10b981"></div></div>
+        <div class="bar-pct">0.82</div>
+      </div>
+      <div class="sentiment-bar">
+        <div class="label2" style="color:#f43f5e">😠 Negative</div>
+        <div class="bar-track"><div class="bar-fill" style="width:9%; background:#f43f5e"></div></div>
+        <div class="bar-pct">0.09</div>
+      </div>
+      <div class="sentiment-bar">
+        <div class="label2" style="color:#94a3b8">😐 Neutral</div>
+        <div class="bar-track"><div class="bar-fill" style="width:9%; background:#64748b"></div></div>
+        <div class="bar-pct">0.09</div>
+      </div>
+    </div>
+
+    <div style="margin-top:20px; padding:14px; background:var(--surface2); border-radius:10px; border-left:3px solid #f59e0b;">
+      <div style="font-size:11px; letter-spacing:2px; color:#f59e0b; font-family:'JetBrains Mono',monospace; margin-bottom:8px">KEY INSIGHT</div>
+      <p style="font-size:13px; color:var(--muted); line-height:1.65">
+        Compare with <strong style="color:#f43f5e">"the food is bad"</strong> → x₄=[0,0,0,0,1,0] would push h₄ toward negative sentiment.<br>
+        And <strong style="color:#a78bfa">"the food is not good"</strong> → the word <em>not</em> (x₄=[0,0,0,0,0,1]) enters h₄ via Whh·h₃, but vanilla RNNs struggle with long-range negation — this is exactly why <strong>LSTMs and GRUs</strong> were invented!
+      </p>
+    </div>
+  </div>
+
+</div>
+</body>
+</html>
