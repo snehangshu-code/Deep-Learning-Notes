@@ -183,10 +183,13 @@ function loadNote(noteId) {
             return; // onload is set inside the fetch, so return early
 
         } else {
-            // ── PDF: remove sandbox so native browser PDF viewer works ──
+            // ── PDF: use Google Docs Viewer for external URLs (raw.githubusercontent.com
+            //    sends Content-Disposition: attachment which forces download in iframes)
             noteFrame.removeAttribute('sandbox');
             noteFrame.removeAttribute('srcdoc');
-            noteFrame.src = note.file;
+            const viewerUrl = `https://docs.google.com/viewer?url=${encodeURIComponent(note.file)}&embedded=true`;
+            noteFrame.src = viewerUrl;
+            tocList.innerHTML = '<div class="toc-empty">No headings (PDF file)</div>';
         }
 
     } else {
