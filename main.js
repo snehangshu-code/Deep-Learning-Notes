@@ -183,12 +183,10 @@ function loadNote(noteId) {
             return; // onload is set inside the fetch, so return early
 
         } else {
-            // ── PDF: use Google Docs Viewer for external URLs (raw.githubusercontent.com
-            //    sends Content-Disposition: attachment which forces download in iframes)
+            // ── PDF: load directly (jsDelivr CDN serves correct MIME type) ──
             noteFrame.removeAttribute('sandbox');
             noteFrame.removeAttribute('srcdoc');
-            const viewerUrl = `https://docs.google.com/viewer?url=${encodeURIComponent(note.file)}&embedded=true`;
-            noteFrame.src = viewerUrl;
+            noteFrame.src = note.file;
             tocList.innerHTML = '<div class="toc-empty">No headings (PDF file)</div>';
         }
 
@@ -512,6 +510,7 @@ async function fetchNotes() {
                 return {
                     id: dbNote.id,
                     title: dbNote.title,
+                    // jsDelivr CDN URL — proper CORS & MIME types
                     file: dbNote.file_url,
                     isExternalUrl: true,
                     fileType: dbNote.file_type || 'pdf',

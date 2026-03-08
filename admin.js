@@ -183,8 +183,9 @@ async function githubUpload(fileName, base64Content) {
     }
 
     const data = await res.json();
-    const rawUrl = `https://raw.githubusercontent.com/${GH_OWNER}/${GH_REPO}/${GH_BRANCH}/${path}`;
-    return { sha: data.content.sha, rawUrl, path };
+    // Use jsDelivr CDN — has proper CORS headers and correct Content-Type (unlike raw.githubusercontent.com)
+    const cdnUrl = `https://cdn.jsdelivr.net/gh/${GH_OWNER}/${GH_REPO}@${GH_BRANCH}/${path}`;
+    return { sha: data.content.sha, rawUrl: cdnUrl, path };
 }
 
 async function githubDelete(filePath, sha) {
@@ -364,7 +365,11 @@ refreshNotesBtn.addEventListener('click', () => {
 async function deleteNote(id, filePath, sha) {
     if (!confirm('Delete this note? This cannot be undone.')) return;
     try {
-        if (filePath && sha) await githubDelete(filePath, sha);
+        // Try to delete from GitHub (non-blocking — still removes Firestore entry if this fails)
+        if (filePath && sha) {
+            try { await githubDelete(filePath, sha); }
+            catch (ghErr) { console.warn('GitHub delete skipped:', ghErr.message); }
+        }
         await deleteDoc(doc(db, 'notes', id));
         showUploadStatus('Note deleted successfully.');
         fetchNotes();
