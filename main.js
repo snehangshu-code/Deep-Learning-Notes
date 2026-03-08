@@ -2,11 +2,14 @@
    Deep Learning Notes — Main Application Logic
    ═══════════════════════════════════════════════ */
 
+import { db } from './firebase.js';
+import { collection, getDocs, orderBy, query } from 'firebase/firestore';
+
 // ── NOTES CONFIGURATION ──
 // Add new notes here. Each entry creates a sidebar link.
 // Categories are grouped automatically. Order within a category
 // follows array order.
-const NOTES = [
+let NOTES = [
     {
         id: 'rnn-notes',
         title: 'Recurrent Neural Networks',
@@ -124,18 +127,74 @@ function loadNote(noteId) {
     if (!note) return;
 
     activeNoteId = noteId;
-    noteFrame.src = `./notes/${note.file}`;
 
-    // Update URL hash
+    // ── Update URL hash & active nav state ──
     window.location.hash = `note=${noteId}`;
-
-    // Update active state
     document.querySelectorAll('.nav-item').forEach(el => {
         el.classList.toggle('active', el.dataset.noteId === noteId);
     });
-
-    // Close mobile sidebar
     closeSidebar();
+
+    if (note.isExternalUrl) {
+
+        if (note.fileType === 'image') {
+            // ── IMAGE: render centered inside the iframe ──
+            noteFrame.setAttribute('sandbox', 'allow-scripts allow-same-origin');
+            noteFrame.removeAttribute('srcdoc');
+            noteFrame.src = 'about:blank';
+            noteFrame.onload = () => {
+                const doc = noteFrame.contentDocument || noteFrame.contentWindow.document;
+                doc.open();
+                doc.write(`<!DOCTYPE html><html><head><style>
+                    body{margin:0;background:#0f1115;display:flex;align-items:center;justify-content:center;min-height:100vh;padding:20px;box-sizing:border-box;}
+                    img{max-width:100%;max-height:100vh;object-fit:contain;border-radius:8px;box-shadow:0 8px 32px rgba(0,0,0,0.5);}
+                </style></head><body><img src="${note.file}" alt="${note.title}"></body></html>`);
+                doc.close();
+                tocList.innerHTML = '<div class="toc-empty">No headings (Image file)</div>';
+                resetZoom();
+            };
+
+        } else if (note.fileType === 'html') {
+            // ── HTML: fetch raw text & inject via srcdoc (bypasses MIME type issue) ──
+            noteFrame.setAttribute('sandbox', 'allow-scripts allow-same-origin allow-popups');
+            tocList.innerHTML = '<div class="toc-empty">Loading...</div>';
+            fetch(note.file)
+                .then(r => r.text())
+                .then(html => {
+                    noteFrame.removeAttribute('src');
+                    noteFrame.srcdoc = html;
+                    noteFrame.onload = () => {
+                        extractTableOfContents();
+                        resetZoom();
+                        try {
+                            const iframeDoc = noteFrame.contentDocument || noteFrame.contentWindow.document;
+                            iframeDoc.addEventListener('mousemove', resetIdleTimer);
+                            iframeDoc.addEventListener('touchstart', resetIdleTimer);
+                            iframeDoc.addEventListener('keydown', resetIdleTimer);
+                            resetIdleTimer();
+                        } catch (e) { }
+                    };
+                })
+                .catch(() => {
+                    // Fallback: open directly
+                    noteFrame.srcdoc = '';
+                    noteFrame.src = note.file;
+                });
+            return; // onload is set inside the fetch, so return early
+
+        } else {
+            // ── PDF: remove sandbox so native browser PDF viewer works ──
+            noteFrame.removeAttribute('sandbox');
+            noteFrame.removeAttribute('srcdoc');
+            noteFrame.src = note.file;
+        }
+
+    } else {
+        // ── LOCAL file (.html in /notes): restore full sandbox ──
+        noteFrame.setAttribute('sandbox', 'allow-scripts allow-same-origin allow-popups');
+        noteFrame.removeAttribute('srcdoc');
+        noteFrame.src = `./notes/${note.file}`;
+    }
 
     // Extract ToC once the iframe loads and reset zoom
     noteFrame.onload = () => {
@@ -148,7 +207,6 @@ function loadNote(noteId) {
             iframeDoc.addEventListener('mousemove', resetIdleTimer);
             iframeDoc.addEventListener('touchstart', resetIdleTimer);
             iframeDoc.addEventListener('keydown', resetIdleTimer);
-            // Also trigger once on load to start the timer
             resetIdleTimer();
         } catch (e) { }
     };
@@ -423,7 +481,48 @@ window.addEventListener('keydown', resetIdleTimer);
 // ═══════════════════════════════════════
 // INIT
 // ═══════════════════════════════════════
-function init() {
+async function fetchNotes() {
+    try {
+        const q = query(collection(db, 'notes'), orderBy('created_at', 'desc'));
+        const snapshot = await getDocs(q);
+
+        if (!snapshot.empty) {
+            const dbNotes = snapshot.docs.map(docSnap => {
+                const dbNote = { id: docSnap.id, ...docSnap.data() };
+
+                // Determine icon based on category
+                let icon = '<svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>';
+                if (dbNote.category === 'RNN') {
+                    icon = '<svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>';
+                } else if (dbNote.category === 'CNN') {
+                    icon = '<svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>';
+                }
+
+                return {
+                    id: dbNote.id,
+                    title: dbNote.title,
+                    file: dbNote.file_url,
+                    isExternalUrl: true,
+                    fileType: dbNote.file_type || 'pdf',
+                    category: dbNote.category,
+                    icon,
+                    description: dbNote.description || '',
+                    tags: dbNote.tags || [],
+                };
+            });
+
+            // Combine local static notes with DB notes
+            NOTES = [...NOTES, ...dbNotes];
+        }
+    } catch (error) {
+        console.error('Error fetching notes from Firebase:', error);
+    }
+}
+
+async function init() {
+    // Fetch data first
+    await fetchNotes();
+
     // Restore layout state
     restoreSidebarState();
     restoreTocState();
