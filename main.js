@@ -483,8 +483,16 @@ window.addEventListener('keydown', resetIdleTimer);
 // ═══════════════════════════════════════
 async function fetchNotes() {
     try {
-        const q = query(collection(db, 'notes'), orderBy('created_at', 'desc'));
-        const snapshot = await getDocs(q);
+        let snapshot;
+        try {
+            // Try ordered query first
+            const q = query(collection(db, 'notes'), orderBy('created_at', 'desc'));
+            snapshot = await getDocs(q);
+        } catch (indexErr) {
+            // Fallback: unordered fetch (works without composite index)
+            console.warn('Ordered query failed, falling back:', indexErr.message);
+            snapshot = await getDocs(collection(db, 'notes'));
+        }
 
         if (!snapshot.empty) {
             const dbNotes = snapshot.docs.map(docSnap => {
@@ -513,11 +521,13 @@ async function fetchNotes() {
 
             // Combine local static notes with DB notes
             NOTES = [...NOTES, ...dbNotes];
+            console.log(`✅ Loaded ${dbNotes.length} note(s) from Firestore`);
         }
     } catch (error) {
         console.error('Error fetching notes from Firebase:', error);
     }
 }
+
 
 async function init() {
     // Fetch data first
