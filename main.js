@@ -286,6 +286,21 @@ function loadNoteFromHash() {
     noteFrame.src = './notes/welcome.html';
     noteFrame.onload = () => {
         tocList.innerHTML = '<div class="toc-empty">Select a note to see its outline</div>';
+
+        // Inject dynamic stats into welcome screen
+        try {
+            const doc = noteFrame.contentDocument || noteFrame.contentWindow.document;
+            const notesEl = doc.getElementById('stat-notes');
+            const catsEl = doc.getElementById('stat-categories');
+
+            if (notesEl && catsEl) {
+                notesEl.textContent = NOTES.length;
+                const uniqueCategories = new Set(NOTES.map(n => n.category)).size;
+                catsEl.textContent = uniqueCategories;
+            }
+        } catch (e) {
+            console.error('Could not inject stats into welcome screen:', e);
+        }
     };
 }
 
