@@ -178,6 +178,7 @@ body.dark-theme {
     display: flex;
     flex-direction: column;
     padding: 24px;
+    transition: all 0.3s ease;
 }
 
 .sidebar-brand {
@@ -235,6 +236,7 @@ body.dark-theme {
     flex-direction: column;
     gap: 24px;
     overflow-y: auto;
+    overflow-x: hidden;
     padding-right: 12px;
 }
 
@@ -657,4 +659,135 @@ textarea {
 
 ::-webkit-scrollbar-thumb:hover {
     background: rgba(255, 255, 255, 0.2);
+}
+
+/* ── RESPONSIVE DESIGN ── */
+@media (max-width: 768px) {
+    .dashboard-wrapper {
+        flex-direction: column;
+        padding: 16px;
+        padding-right: 16px;
+        gap: 16px;
+        overflow-y: auto;
+    }
+
+    .dashboard-sidebar {
+        width: 100%;
+        padding: 16px;
+        flex-direction: row;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+    }
+
+    .sidebar-brand {
+        margin-bottom: 0;
+    }
+
+    .sidebar-brand span {
+        display: none;
+        /* Hide text, show only icon on mobile header */
+    }
+
+    .sidebar-nav {
+        flex-direction: row;
+        gap: 8px;
+        flex: unset;
+        justify-content: center;
+    }
+
+    .nav-item {
+        padding: 8px 12px;
+    }
+
+    .nav-item.active {
+        box-shadow: 0 2px 8px rgba(255, 255, 255, 0.1);
+    }
+
+    .nav-item span,
+    .nav-item text {
+        display: none;
+        /* Hide text, show only icons if we want, or adjust */
+    }
+
+    /* Reveal text selectively if space permits, but typically hide text or use specific class if needed */
+    .nav-item {
+        font-size: 0;
+        /* visually hide text but keep accessible if needed */
+    }
+
+    .nav-item svg {
+        margin: 0;
+    }
+
+    .sidebar-footer {
+        margin-top: 0;
+    }
+
+    .btn-secondary {
+        padding: 8px;
+        width: auto;
+    }
+
+    .btn-secondary svg {
+        margin: 0;
+    }
+
+    .btn-secondary span {
+        display: none;
+        /* Hide text, show only icon */
+    }
+
+    .dashboard-main {
+        padding-right: 0;
+        overflow-y: visible;
+    }
+
+    .dashboard-header h1 {
+        font-size: 1.5rem;
+    }
+
+    .upload-section {
+        padding: 16px;
+    }
+
+    .drop-zone {
+        padding: 24px 16px;
+    }
+
+    .auth-wrapper {
+        padding: 16px;
+    }
+
+    .auth-panel {
+        padding: 24px;
+    }
+
+    .recent-notes {
+        padding: 16px;
+    }
+}
+
+@media (max-width: 480px) {
+    .nav-item {
+        padding: 8px;
+    }
+
+    .notes-table th,
+    .notes-table td {
+        padding: 8px 10px;
+        font-size: 0.85rem;
+    }
+
+    .dashboard-wrapper {
+        padding: 12px;
+    }
+
+    .dashboard-sidebar,
+    .auth-wrapper,
+    .upload-section,
+    .recent-notes,
+    .drop-zone {
+        padding: 12px;
+    }
 }
